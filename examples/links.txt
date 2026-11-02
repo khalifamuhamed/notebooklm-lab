@@ -1,0 +1,6 @@
+# رابط أو مسار ملف في كل سطر. الأسطر التي تبدأ بـ # تُتجاهل.
+# One link or file path per line. Lines starting with # are ignored.
+# استبدل هذه الأمثلة بروابطك الحقيقية / replace these examples with your real links:
+https://example.com/article
+https://www.youtube.com/watch?v=VIDEO_ID
+examples/sample_notes.md
