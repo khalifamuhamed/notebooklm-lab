@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from . import PINNED_NOTEBOOKLM_PY, __version__, agents, secrets_scan, selfcheck, storage
+from . import PINNED_NOTEBOOKLM_PY, __version__, agents, scheduler, secrets_scan, selfcheck, storage
 from .config import DEFAULT_LANGUAGE, DEFAULT_OUTPUTS, OUTPUT_KINDS, output_root, repo_root
 from .pipeline import DEFAULT_QUESTIONS_AR, make_run_dir, run_digest
 from .sources import SourceError, build_specs, read_links_file
@@ -108,6 +108,59 @@ def cmd_digest(a) -> int:
     return 0
 
 
+def _morning_paths(a):
+    from .morning import make_paths
+
+    return make_paths(Path(a.data_dir) if a.data_dir else None, sample=bool(getattr(a, "sample", False)))
+
+
+def cmd_morning(a) -> int:
+    from .morning import EXIT_USAGE, run_morning
+
+    action = a.morning_cmd or "run"
+    if action == "status":
+        from .morning import status_text
+
+        print(status_text(_morning_paths(a)))
+        return 0
+    if action in ("schedule", "unschedule"):
+        return _morning_schedule(a, action)
+    if a.audio_timeout <= 0 or a.max_links <= 0:
+        print("✘ --audio-timeout و --max-links يجب أن يكونا أكبر من صفر / must be > 0")
+        return EXIT_USAGE
+    paths = _morning_paths(a)
+    if a.sample:
+        from .sample_backend import SampleBackend
+
+        backend = SampleBackend()
+    else:
+        from .real_backend import RealBackend
+
+        backend = RealBackend(profile=a.profile, timeouts={"audio": a.audio_timeout * 60.0})
+    outcome = asyncio.run(run_morning(backend, paths, audio_timeout_min=a.audio_timeout, max_links=a.max_links, say=print))
+    if a.open and outcome.run_dir and (outcome.run_dir / "report.html").exists():
+        print(storage.open_path(outcome.run_dir / "report.html"))
+    return outcome.code
+
+
+def _morning_schedule(a, action: str) -> int:
+    target = a.target or scheduler.default_target()
+    try:
+        if action == "unschedule":
+            print(scheduler.remove(target))
+            return 0
+        data = _morning_paths(a).base
+        python = a.python or sys.executable
+        print(scheduler.describe(target, a.time, python, data))
+        if a.install:
+            print()
+            print(scheduler.install(target, a.time, python, data))
+        return 0
+    except scheduler.ScheduleError as exc:
+        print(f"✘ {exc}")
+        return 2
+
+
 def cmd_session(a) -> int:
     if a.action == "where":
         print(storage.session_report(a.profile))
@@ -180,6 +233,28 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--profile", help="notebooklm-py login profile name")
     g.add_argument("--out"), g.add_argument("--open", action="store_true")
     g.set_defaults(fn=cmd_digest)
+
+    m = sub.add_parser("morning", help="morning digest: new inbox links -> Arabic summary + podcast (schedule / status)")
+    m.add_argument("--sample", action="store_true", help="offline sample mode (separate state; real links are not consumed)")
+    m.add_argument("--data-dir", help="your data folder (default: ~/NotebookLM-Lab or $NOTEBOOKLM_LAB_DATA)")
+    m.add_argument("--profile", help="notebooklm-py login profile name")
+    m.add_argument("--audio-timeout", type=float, default=20.0, help="minutes to wait for the audio overview (default 20)")
+    m.add_argument("--max-links", type=int, default=20, help="max new links per run (default 20; the rest wait for the next run)")
+    m.add_argument("--open", action="store_true", help="open the report when done")
+    m.set_defaults(fn=cmd_morning, morning_cmd=None)
+    # sub-actions share --data-dir/--sample; SUPPRESS keeps values given before the action word
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--data-dir", default=argparse.SUPPRESS)
+    common.add_argument("--sample", action="store_true", default=argparse.SUPPRESS)
+    msub = m.add_subparsers(dest="morning_cmd", metavar="{schedule,unschedule,status}")
+    ms = msub.add_parser("schedule", parents=[common], help="print (or --install) a daily job")
+    ms.add_argument("--time", default="07:30", help="HH:MM, 24h (default 07:30)")
+    ms.add_argument("--target", choices=["windows", "cron"], help="default: windows on Windows, cron elsewhere")
+    ms.add_argument("--install", action="store_true", help="actually create the job (default: only print the command)")
+    ms.add_argument("--python", help="python executable the job should use (default: the current one)")
+    mu = msub.add_parser("unschedule", parents=[common], help="remove the daily job")
+    mu.add_argument("--target", choices=["windows", "cron"])
+    msub.add_parser("status", parents=[common], help="last run, links processed, where the outputs are")
 
     s = sub.add_parser("session", help="where is my Google login session stored / delete it")
     s.add_argument("action", choices=["where", "delete"]), s.add_argument("--yes", action="store_true"), s.add_argument("--profile")

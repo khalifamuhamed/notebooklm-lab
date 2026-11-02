@@ -35,7 +35,10 @@ _TIMEOUTS = {"audio": 1200.0, "slide_deck": 900.0}
 class RealBackend(Backend):
     mode = "real"
 
-    def __init__(self, profile: Optional[str] = None, storage_path: Optional[str] = None) -> None:
+    def __init__(
+        self, profile: Optional[str] = None, storage_path: Optional[str] = None, timeouts: Optional[Dict[str, float]] = None
+    ) -> None:
+        self._timeouts = {**_TIMEOUTS, **(timeouts or {})}
         self.profile = profile
         self.storage_path = storage_path
         self._ctx = None
@@ -110,7 +113,7 @@ class RealBackend(Backend):
         art = self._client.artifacts
         dest_dir.mkdir(parents=True, exist_ok=True)
         out = str(dest_dir / _FILES[kind])
-        timeout = _TIMEOUTS.get(kind, 600.0)
+        timeout = self._timeouts.get(kind, 600.0)
 
         if kind in ("briefing", "study_guide"):
             fmt = ReportFormat.BRIEFING_DOC if kind == "briefing" else ReportFormat.STUDY_GUIDE

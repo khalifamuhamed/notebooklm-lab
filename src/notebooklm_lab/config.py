@@ -27,3 +27,17 @@ def output_root() -> Path:
     if env:
         return Path(env).expanduser().resolve()
     return (Path.cwd() / "outputs").resolve()
+
+
+ENV_DATA_DIR = "NOTEBOOKLM_LAB_DATA"
+
+
+def data_dir() -> Path:
+    """The user's data folder (inbox.txt, morning state, morning outputs).
+
+    Default: ~/NotebookLM-Lab  (Windows: C:\\Users\\<you>\\NotebookLM-Lab).
+    Override with NOTEBOOKLM_LAB_DATA or `morning --data-dir`."""
+    env = os.environ.get(ENV_DATA_DIR)
+    if env:
+        return Path(env).expanduser().resolve()
+    return (Path.home() / "NotebookLM-Lab").resolve()
