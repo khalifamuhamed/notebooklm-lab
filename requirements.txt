@@ -1,0 +1,3 @@
+# Runtime dependencies (pinned). notebooklm-py is an UNOFFICIAL third-party
+# library by Teng Lin (MIT): https://github.com/teng-lin/notebooklm-py
+notebooklm-py[browser,mcp]==0.8.6

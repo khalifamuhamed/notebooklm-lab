@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest==9.2.0
+# Official MCP Python SDK, used only by the self-check that starts the MCP
+# server and lists its tools.
+mcp==2.3.0

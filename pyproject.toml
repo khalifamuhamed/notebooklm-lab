@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notebooklm-lab"
+version = "0.1.0"
+description = "Prototype: Arabic content-creator workflow on top of the unofficial notebooklm-py library (not affiliated with Google)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "muhamed khalifa" }]
+# notebooklm-py is a DECLARED, PINNED third-party dependency (MIT, by Teng Lin).
+# We never copy its code. Extras used:
+#   browser -> Playwright, needed once for `notebooklm login`
+#   mcp     -> upstream's own MCP server (`notebooklm-mcp`)
+dependencies = [
+  "notebooklm-py[browser,mcp]==0.8.6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.2.0",
+  "mcp==2.3.0",
+]
+
+[project.scripts]
+notebooklm-lab = "notebooklm_lab.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
