@@ -10,6 +10,8 @@ pip install -r requirements-dev.txt && pip install -e .
 python -m notebooklm_lab demo                    # offline SAMPLE data, no login
 python -m notebooklm_lab digest --file links.txt # REAL NotebookLM (needs the user's own login)
 python -m notebooklm_lab digest --file links.txt --sample
+python -m notebooklm_lab morning --sample        # morning digest offline (inbox.txt in ~/NotebookLM-Lab or --data-dir)
+python -m notebooklm_lab morning status | schedule --time 07:30 [--install] | unschedule
 python -m notebooklm_lab selfcheck --mcp         # pins, sample mode, .gitignore, secrets, MCP tools
 pytest -q
 ```

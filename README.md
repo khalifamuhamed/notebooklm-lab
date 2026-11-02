@@ -135,6 +135,84 @@ python -m notebooklm_lab digest --file links.txt --sample
 * **المخرجات المتاحة:** `briefing`, `study_guide`, `mind_map`, `audio`, `quiz`, `flashcards`, `slide_deck`. الافتراضي: `briefing,study_guide,mind_map,audio`.
 * **الوقت:** توليد الصوت قد يستغرق عدة دقائق (المهلة حتى 20 دقيقة). **وكل توليد يستهلك حصة حسابك** في Google.
 
+## ٧-ب. الملخص الصباحي التلقائي (`morning`)
+
+### ماذا يفعل؟
+تلصق روابط (يوتيوب أو مقالات) في ملف نصي بسيط طوال اليوم، وفي الصباح يأخذ الأمر **الروابط الجديدة فقط** ويضعها في دفتر NotebookLM باسم مؤرَّخ مثل «ملخص صباحي 2026-11-03»، ثم يُنتج:
+
+1. **ملخصًا مكتوبًا بالعربية** (Briefing)،
+2. **بودكاست صوتيًا بالعربية** (Audio Overview)،
+3. **تقريرًا قصيرًا بالعربية** `morning_report.md` + تقريرًا كاملًا `report.html`،
+
+ويحفظها كلها في **مجلد باسم تاريخ اليوم**. ويسجّل الروابط التي عولجت فلا تتكرر في اليوم التالي. إن لم تكن هناك روابط جديدة يكتب رسالة عربية ويخرج بهدوء دون أن يستهلك شيئًا من حصتك.
+
+### كيف أضيف الروابط؟
+افتح الملف `inbox.txt` (مكانه في الأسفل — يُنشأ تلقائيًا أول مرة) بالمفكرة (Notepad) وألصق **رابطًا واحدًا في كل سطر**:
+
+```text
+# هذه ملاحظة (الأسطر التي تبدأ بعلامة # تُتجاهل)
+https://www.youtube.com/watch?v=VIDEO_ID
+https://example.com/some-article    # يمكن كتابة ملاحظة بعد مسافة وعلامة #
+
+```
+الأسطر الفارغة تُتجاهل، والرابط المكرر يُؤخذ مرة واحدة (حتى لو كُتب بصيغتين مثل `youtu.be/ID` و`youtube.com/watch?v=ID`). **لا تحذف الروابط القديمة من الملف**، فالأداة تتذكر ما عولج. سطر غير صالح (ليس رابط http/https) يُبلَّغ عنه ويُتجاهل.
+
+### كيف أشغّله؟
+```powershell
+python -m notebooklm_lab morning --sample      # تجربة كاملة بدون حساب وبدون إنترنت (بيانات مثال فقط)
+python -m notebooklm_lab login                 # مرة واحدة فقط (انظر القسم ٦)
+python -m notebooklm_lab morning               # التشغيل الحقيقي: الروابط الجديدة فقط
+python -m notebooklm_lab morning status        # آخر تشغيل، عدد الروابط، وأين الملفات
+python -m notebooklm_lab morning --open        # يفتح التقرير في المتصفح عند الانتهاء
+```
+* الوضع `--sample` يستخدم **ملف حالة ومجلد مخرجات منفصلين** (`morning-sample`)، فتجربته لا «تستهلك» روابطك الحقيقية.
+* خيارات: `--audio-timeout 30` (دقائق الانتظار للبودكاست، الافتراضي 20)، `--max-links 20` (أقصى عدد روابط في التشغيل الواحد؛ الباقي يبقى للتشغيل التالي).
+* **عند الأعطال:** انتهاء تسجيل الدخول ← رسالة واضحة (شغّل `login` من جديد) والروابط تبقى «جديدة» ولا تضيع. توليد البودكاست بطيء ← ينتظر حتى المهلة ثم يحتفظ بالملخص المكتوب ويكتب في التقرير أن الصوت لم يُنشأ. رابط واحد سيّئ ← يُتخطى والباقي يكتمل؛ ويُعاد تجريبه مرة واحدة في تشغيل لاحق ثم يُسجَّل «فاشل». كل تشغيل **يستهلك حصة حسابك في Google**.
+* ملاحظة: إذا نجح الملخص المكتوب وفشل الصوت فقط، تُعتبر الروابط «معالَجة» ولا تُعاد تلقائيًا (أعد إضافة الرابط يدويًا بتعديل بسيط في الملف لو أردت إعادته: غيّر الرابط بإضافة `?x=1`، أو احذف سجله من `morning_state.json`).
+
+### الجدولة على Windows (جهازك الشخصي) — الأساس
+```powershell
+python -m notebooklm_lab morning schedule --time 07:30             # يطبع الأمر فقط (لا يغيّر شيئًا)
+python -m notebooklm_lab morning schedule --time 07:30 --install  # ينشئ مهمة يومية في «مجدول مهام Windows»
+schtasks /Query /TN "NotebookLM-Lab Morning"                       # للتأكد من وجودها
+schtasks /Run /TN "NotebookLM-Lab Morning"                         # لتجربتها الآن
+python -m notebooklm_lab morning unschedule                        # لإزالتها
+```
+* تعمل المهمة **فقط والجهاز مفتوح وأنت مسجّل الدخول** عند الوقت المحدد؛ وإن كان مطفأً لا تُشغَّل ذلك اليوم (يمكنك تفعيل «Run task as soon as possible after a scheduled start is missed» من خصائص المهمة في برنامج Task Scheduler). ستظهر نافذة سوداء أثناء العمل وقد يستغرق البودكاست عدة دقائق.
+* **استخدم نفس Python الذي ثبّتّ فيه المشروع** (إن كنت تستخدم بيئة `.venv` فشغّل أمر الجدولة من داخلها؛ الأداة تكتب مسار Python الحالي في المهمة).
+
+### الجدولة على خادم VPS (لينكس) — cron
+```bash
+python -m notebooklm_lab morning schedule --time 07:30 --target cron             # يطبع سطر cron
+python -m notebooklm_lab morning schedule --time 07:30 --target cron --install   # يضيفه إلى crontab
+crontab -l                                                                       # للتحقق
+python -m notebooklm_lab morning unschedule --target cron                        # يزيله (ولا يلمس مهام cron الأخرى)
+```
+سجلّ التشغيل في `morning.cron.log` و`morning.log` داخل مجلد البيانات.
+
+> ⚠ **تنبيه تسجيل الدخول على الـ VPS:** الخادم لا يملك متصفحًا، لذلك **سجّل الدخول على جهازك (PC)** بـ `python -m notebooklm_lab login` ثم **انسخ ملف الجلسة** (`storage_state.json` داخل `~/.notebooklm/profiles/default/`، ويمكنك معرفة مكانه بـ `python -m notebooklm_lab session where`) إلى المسار نفسه على الخادم بأداة آمنة مثل `scp`. هذا الملف **يعادل كلمة سر حسابك**: لا ترفعه إلى Git ولا ترسله لأحد. وقد **تطلب Google إعادة تسجيل الدخول** بعد فترة، أو **تعتبره دخولًا مشبوهًا** (لأن الـ IP تغيّر إلى عنوان خادم) فتحجب الجلسة أو تطلب تحققًا — عندها كرّر تسجيل الدخول على الـ PC وانسخ الملف من جديد. لا تُسجّل الدخول بحسابك الأساسي المهم إن كنت قلقًا؛ ويُفضّل حساب Google مخصص لهذا الغرض.
+
+### أين تُحفظ الملفات؟ وكيف أحذفها؟
+المجلد الافتراضي (على Windows: `C:\Users\اسمك\NotebookLM-Lab`، ولينكس: `~/NotebookLM-Lab`). غيّره بـ `--data-dir` أو المتغير `NOTEBOOKLM_LAB_DATA`.
+
+```text
+NotebookLM-Lab\
+├─ inbox.txt                 ← ألصق روابطك هنا
+├─ morning_state.json        ← ذاكرة الروابط التي عولجت وآخر تشغيل
+├─ morning.log               ← سجلّ التشغيلات
+├─ morning\2026-11-03\       ← مجلد اليوم (تشغيل ثانٍ في اليوم نفسه: 2026-11-03-2)
+│   ├─ morning_report.md     ← التقرير القصير بالعربية
+│   ├─ report.html           ← التقرير الكامل (RTL)
+│   ├─ run.json
+│   └─ files\ (الملخص المكتوب + البودكاست الصوتي)
+└─ morning-sample\          ← مخرجات التجربة فقط
+```
+* **الحذف:** احذف مجلد يوم معيّن من File Explorer، أو:
+  `python -m notebooklm_lab outputs delete --all --yes --out "C:\Users\اسمك\NotebookLM-Lab\morning"`.
+  لحذف «ذاكرة» الروابط (فتُعالَج الروابط من جديد) احذف `morning_state.json`. مجلد البيانات كله يمكن حذفه بأمان؛ لا يحتوي على جلسة الدخول (تلك في `~/.notebooklm`، وتُحذف بـ `session delete --yes`).
+* دفاتر NotebookLM نفسها تبقى في حسابك على موقع NotebookLM حتى تحذفها من هناك.
+* كل هذه الملفات **مستبعدة من Git**؛ ولا تضع روابط خاصة أو بيانات حقيقية في المستودع.
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -190,7 +268,11 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | الوضع التجريبي (`demo` و`digest --sample`) من البداية للنهاية + تقرير RTL | ✔ مُختبر آليًا ويدويًا |
 | الوحدات: التصنيف، التقرير، الهروب من HTML، الأسرار، التخزين والحذف، الأوامر | ✔ اختبارات pytest |
 | مسار الوضع الحقيقي مقابل **عميل مزيّف** (يتحقق أن الأداة تستدعي المكتبة بالوسائط الصحيحة: `ar_001`، `wait=True`، الصيغ…) | ✔ مُختبر، لكنه **لا يثبت** أن Google تقبل الطلبات |
-| الوضع الحقيقي مع **حساب Google فعلي** (إنشاء دفتر، رفع، بودكاست عربي) | ✘ **لم يُجرَّب** — يحتاج تسجيل دخولك |
+| `morning`: قراءة الروابط والتكرار وملف الحالة ومسار «لا روابط جديدة» والتشغيل التجريبي الكامل مرتين (الثاني يقول لا جديد) | ✔ اختبارات pytest + تشغيل يدوي |
+| `morning`: الأعطال (تسجيل دخول منتهٍ، مهلة الصوت، رابط سيّئ) | ✔ مُختبرة بواجهات مزيّفة فقط، **لا** مع Google الحقيقية |
+| `morning schedule/unschedule` لـ cron: تثبيت وإزالة فعليان على Linux | ✔ جُرّبا فعليًا (لكن لم يُراقَب تشغيل cron في موعده) |
+| `morning schedule --install` على **Windows** (`schtasks`) | ✘ لم يُجرَّب على Windows؛ الأمر المولَّد مغطى باختبارات نصية فقط |
+| الوضع الحقيقي مع **حساب Google فعلي** (إنشاء دفتر، رفع، بودكاست عربي) — ومنه `morning` الحقيقي | ✘ **لم يُجرَّب** — يحتاج تسجيل دخولك |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -200,7 +282,8 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 ## ١٢. هيكل المشروع
 
 ```
-src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents
+src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
+                      morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي
 examples/             links.txt و sample_notes.md
