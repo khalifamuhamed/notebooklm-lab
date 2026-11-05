@@ -12,6 +12,9 @@ python -m notebooklm_lab digest --file links.txt # REAL NotebookLM (needs the us
 python -m notebooklm_lab digest --file links.txt --sample
 python -m notebooklm_lab morning --sample        # morning digest offline (inbox.txt in ~/NotebookLM-Lab or --data-dir)
 python -m notebooklm_lab morning status | schedule --time 07:30 [--install] | unschedule
+python -m notebooklm_lab config init|show        # private settings file <data>/notebooklm-lab.env (git-ignored; names in .env.example)
+python -m notebooklm_lab telegram setup-check [--send-test] | chat-id | send [file] [--sample]   # needs TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+python -m notebooklm_lab morning --telegram      # also send summary + podcast to Telegram (or NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)
 python -m notebooklm_lab selfcheck --mcp         # pins, sample mode, .gitignore, secrets, MCP tools
 pytest -q
 ```
@@ -25,6 +28,13 @@ pytest -q
 4. Sample-mode output is **example data, not NotebookLM output**; keep it labelled as such.
 5. Do not push or create GitHub repos unless the user explicitly asks.
 6. Generating audio/video uses the user's Google quota and can take many minutes — confirm before bulk runs.
+
+## Credentials and settings
+All credentials come from environment variables or the local, git-ignored `<data dir>/notebooklm-lab.env`
+(`src/notebooklm_lab/settings.py`; env wins over the file). Never hard-code, print or commit a token; `.env.example` lists names only.
+Optional deliveries after `morning` (`postrun.py`: Telegram) are opt-in, never raise, and never change the morning exit codes
+(0 ok, 2 usage, 3 login missing/expired, 4 all failed). `telegram` commands use exit 5 for Telegram failures.
+Tests must mock the network (`telegram._post`) — never call api.telegram.org.
 
 ## Using NotebookLM from an agent
 Prefer upstream's MCP server (`python -m notebooklm.mcp`, tools such as `notebook_create`, `source_add`,

@@ -1,6 +1,8 @@
 # ---- Secrets / credentials (never commit) ----
 .env
 .env.*
+*.env
+!.env.example
 *.pem
 *.key
 *.p12

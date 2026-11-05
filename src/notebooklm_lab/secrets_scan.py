@@ -36,7 +36,7 @@ CONTENT_RULES: List[Tuple[str, Pattern[str]]] = [
 ]
 
 FORBIDDEN_NAME_GLOBS = [
-    ".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*",
+    ".env", ".env.*", "*.env", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*",
     "storage_state*.json", "*storage_state*", "master_token*.json", "*cookies*", "auth*.json",
 ]
 ALLOWED_NAMES = {".env.example"}

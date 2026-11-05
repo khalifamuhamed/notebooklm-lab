@@ -18,7 +18,7 @@ from .config import repo_root
 Check = Tuple[str, bool, str]
 
 REQUIRED_IGNORED = [
-    ".env", ".env.local", "server.pem", "private.key", "cookies.txt", "my_cookies.json",
+    ".env", ".env.local", "notebooklm-lab.env", "server.pem", "private.key", "cookies.txt", "my_cookies.json",
     "storage_state.json", "auth.json", "master_token.json", "outputs/run/report.html",
     "downloads/a.m4a", "__pycache__/x.pyc", ".venv/bin/python", ".pytest_cache/x", "audio.mp3",
 ]

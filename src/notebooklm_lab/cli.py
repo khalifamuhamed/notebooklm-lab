@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from . import PINNED_NOTEBOOKLM_PY, __version__, agents, scheduler, secrets_scan, selfcheck, storage
+from . import PINNED_NOTEBOOKLM_PY, __version__, agents, scheduler, secrets_scan, selfcheck, settings, storage
 from .config import DEFAULT_LANGUAGE, DEFAULT_OUTPUTS, OUTPUT_KINDS, output_root, repo_root
 from .pipeline import DEFAULT_QUESTIONS_AR, make_run_dir, run_digest
 from .sources import SourceError, build_specs, read_links_file
@@ -138,9 +138,20 @@ def cmd_morning(a) -> int:
 
         backend = RealBackend(profile=a.profile, timeouts={"audio": a.audio_timeout * 60.0})
     outcome = asyncio.run(run_morning(backend, paths, audio_timeout_min=a.audio_timeout, max_links=a.max_links, say=print))
+    _post_actions(outcome, paths, a)
     if a.open and outcome.run_dir and (outcome.run_dir / "report.html").exists():
         print(storage.open_path(outcome.run_dir / "report.html"))
     return outcome.code
+
+
+def _post_actions(outcome, paths, a) -> None:
+    """Opt-in deliveries (Telegram ...). They can never change the exit code of the morning run."""
+    try:
+        from .postrun import run_post_actions
+
+        run_post_actions(outcome, paths, telegram=a.telegram, say=print)
+    except Exception as exc:  # pragma: no cover - run_post_actions already guards itself
+        print(f"⚠ تعذّر تنفيذ التسليم الإضافي ({type(exc).__name__}); الملخص سليم. / post-run delivery failed; the digest is intact.")
 
 
 def _morning_schedule(a, action: str) -> int:
@@ -159,6 +170,44 @@ def _morning_schedule(a, action: str) -> int:
     except scheduler.ScheduleError as exc:
         print(f"✘ {exc}")
         return 2
+
+
+def cmd_config(a) -> int:
+    base = Path(a.data_dir) if a.data_dir else None
+    if a.action == "init":
+        path, created = settings.init_file(base)
+        print(f"{'أنشأتُ' if created else 'موجود مسبقًا'} / {'created' if created else 'already exists'}: {path}")
+        print("افتحه بالمفكرة (Notepad) واكتب القيم بعد علامة = ثم احفظ. لا ترفع هذا الملف إلى GitHub.")
+        return 0
+    print(settings.describe(base))
+    return 0
+
+
+def cmd_telegram(a) -> int:
+    from . import telegram
+
+    base = Path(a.data_dir) if a.data_dir else None
+    if a.tg_cmd == "setup-check":
+        return telegram.setup_check(base, send_test=a.send_test)
+    if a.tg_cmd == "chat-id":
+        return telegram.find_chat_ids(base)
+    token, chat = telegram.credentials(base)
+    if not token or not chat:
+        print("✘ TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID مطلوبان. جرّب: python -m notebooklm_lab telegram setup-check")
+        return 2
+    if a.file:
+        rep = telegram.send_file(token, chat, Path(a.file), a.caption or "")
+    else:
+        from . import deliver
+
+        paths = _morning_paths(a)
+        d = deliver.from_run_dir(paths.outputs / a.run) if a.run else deliver.latest(paths.outputs)
+        if d is None:
+            print(f"✘ لا توجد نتيجة صباحية في {paths.outputs} — مرّر ملفًا: telegram send <file>")
+            return 2
+        rep = telegram.send_deliverable(token, chat, d)
+    print(rep.summary())
+    return 0 if rep.ok else telegram.EXIT_TELEGRAM
 
 
 def cmd_session(a) -> int:
@@ -241,6 +290,8 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--audio-timeout", type=float, default=20.0, help="minutes to wait for the audio overview (default 20)")
     m.add_argument("--max-links", type=int, default=20, help="max new links per run (default 20; the rest wait for the next run)")
     m.add_argument("--open", action="store_true", help="open the report when done")
+    m.add_argument("--telegram", action=argparse.BooleanOptionalAction, default=None,
+                   help="send the summary + podcast to Telegram after a run (default: only if NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)")
     m.set_defaults(fn=cmd_morning, morning_cmd=None)
     # sub-actions share --data-dir/--sample; SUPPRESS keeps values given before the action word
     common = argparse.ArgumentParser(add_help=False)
@@ -255,6 +306,26 @@ def build_parser() -> argparse.ArgumentParser:
     mu = msub.add_parser("unschedule", parents=[common], help="remove the daily job")
     mu.add_argument("--target", choices=["windows", "cron"])
     msub.add_parser("status", parents=[common], help="last run, links processed, where the outputs are")
+
+    cf = sub.add_parser("config", help="your private settings file (tokens, folders): init / show")
+    cf.add_argument("action", choices=["show", "init"], nargs="?", default="show")
+    cf.add_argument("--data-dir")
+    cf.set_defaults(fn=cmd_config)
+
+    tg = sub.add_parser("telegram", help="send the morning podcast + summary to Telegram (setup-check / chat-id / send)")
+    tg.add_argument("--data-dir", default=None)
+    tgs = tg.add_subparsers(dest="tg_cmd", required=True)
+    dd = argparse.ArgumentParser(add_help=False)  # lets --data-dir come before or after the action word
+    dd.add_argument("--data-dir", default=argparse.SUPPRESS)
+    tgc = tgs.add_parser("setup-check", parents=[dd], help="verify TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (optionally send a test message)")
+    tgc.add_argument("--send-test", action="store_true", help="also send a short test message")
+    tgs.add_parser("chat-id", parents=[dd], help="find your chat id after you message your bot")
+    tgd = tgs.add_parser("send", parents=[dd], help="send a file (audio), or with no file the latest morning result (summary + podcast)")
+    tgd.add_argument("file", nargs="?", help="audio/document to send; omit to send the latest morning run")
+    tgd.add_argument("--caption", help="caption for the file (max ~1000 characters)")
+    tgd.add_argument("--run", help="a morning run folder name such as 2026-11-03 (default: the latest)")
+    tgd.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
+    tg.set_defaults(fn=cmd_telegram, sample=False, run=None, file=None, caption=None, send_test=False)
 
     s = sub.add_parser("session", help="where is my Google login session stored / delete it")
     s.add_argument("action", choices=["where", "delete"]), s.add_argument("--yes", action="store_true"), s.add_argument("--profile")

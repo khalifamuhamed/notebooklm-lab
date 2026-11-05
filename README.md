@@ -85,6 +85,34 @@ python -m notebooklm_lab demo --open
 
 > ملاحظة: قد تظهر الحروف العربية في نافذة PowerShell القديمة مقلوبة أو متقطعة؛ هذا من الطرفية نفسها وليس من الأداة. **افتح التقرير `report.html` في المتصفح** لرؤية العربية بشكل صحيح من اليمين إلى اليسار.
 
+## ٥-ب. تحديث نسختك إلى آخر كود (دون ضياع بياناتك)
+
+نسختك على `E:\github\notebooklm` منزَّلة كملف ZIP وليست «نسخة git»، ومجلد بياناتك `data` وبيئتك `.venv` **غير موجودين في GitHub**، لذلك لن يمسّهما التحديث أدناه. **الأسهل والموصى به: تحويل المجلد نفسه إلى نسخة git (مرة واحدة)، وبعدها كل تحديث أمر واحد.**
+
+**الطريقة الموصى بها (تحتاج Git للويندوز: `winget install Git.Git` ثم أعد فتح PowerShell):**
+```powershell
+cd E:\github\notebooklm
+git init
+git remote add origin https://github.com/khalifamuhamed/notebooklm-lab.git
+git fetch origin
+git checkout -f -B main origin/main      # يستبدل ملفات المشروع بآخر نسخة؛ لا يحذف .venv ولا data
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pip install -e .
+python -m pytest -q                      # اختياري: اختبارات سريعة بدون حساب
+```
+**التحديثات التالية** (كلما أخبرتك بميزة جديدة):
+```powershell
+cd E:\github\notebooklm
+git pull
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+pip install -e .
+```
+> أي تعديل يدوي أجريتَه على ملفات المشروع نفسها سيُستبدل بـ `checkout -f`؛ ملفاتك الخاصة (`data\` و`notebooklm-lab.env` و`inbox.txt`) آمنة لأنها خارج Git.
+
+**الطريقة البديلة بدون Git:** نزّل https://github.com/khalifamuhamed/notebooklm-lab/archive/refs/heads/main.zip، فُكّ الضغط، وانسخ **محتويات** المجلد الناتج (`src` و`tests` و`docs` و`README.md` وباقي الملفات) فوق `E:\github\notebooklm` ووافق على الاستبدال **دون حذف** `.venv` و`data`، ثم شغّل الأوامر الثلاثة الأخيرة (`Activate` ثم `pip install -r requirements-dev.txt` ثم `pip install -e .`).
+
 ## ٦. تسجيل الدخول (مرة واحدة) — كيف يعمل؟
 
 ```powershell
@@ -213,6 +241,84 @@ NotebookLM-Lab\
 * دفاتر NotebookLM نفسها تبقى في حسابك على موقع NotebookLM حتى تحذفها من هناك.
 * كل هذه الملفات **مستبعدة من Git**؛ ولا تضع روابط خاصة أو بيانات حقيقية في المستودع.
 
+## ٧-ج. إرسال البودكاست والملخص إلى تيليجرام (`telegram`)
+
+> **الحالة: ✘ لم يُختبر بعد مع بوت تيليجرام حقيقي من قِبل المستخدم.** المنطق كله مُختبر آليًا مقابل خادم تيليجرام مزيّف (محلي) واستدعاءات مزيّفة؛ أول إرسال حقيقي يحتاج بوتك أنت.
+
+### ماذا يفعل؟
+بعد كل تشغيل ناجح لـ `morning` يرسل إلى محادثتك على تيليجرام: **(١)** الملخص العربي كرسالة نصية (تُقسَّم تلقائيًا إن كان طويلًا)، **(٢)** ثم **ملف البودكاست الصوتي** مع عنوان قصير. الإرسال **اختياري** (لا يحدث إلا إذا فعّلته)، و**أي فشل في تيليجرام لا يُفسد التشغيل الصباحي**: تبقى كل الملفات على جهازك ويُكتب سبب الفشل بالعربية ويظهر في `morning status`، ويبقى رمز الخروج كما هو (`0` للنجاح، `3` تسجيل الدخول، `4` فشل كامل).
+
+* **حد 50 ميغابايت:** بوتات تيليجرام لا ترفع ملفًا أكبر من 50MB. إذا كان البودكاست أكبر، يضغطه الأمر تلقائيًا بـ **ffmpeg** (إن كان مثبّتًا) إلى صوت أحادي بجودة كافية للكلام ثم يرسله؛ وإذا لم يكن ffmpeg موجودًا (أو لم يكفِ الضغط) يرسل **الملخص + ملاحظة** تقول إن الملف الصوتي لم يُرسل، وهو محفوظ على جهازك. لتثبيت ffmpeg على Windows: `winget install Gyan.FFmpeg` (ثم أغلق PowerShell وافتحه من جديد).
+* **الخصوصية:** رسائل البوتات تمرّ عبر خوادم تيليجرام (غير مشفّرة طرفًا لطرف). أرسل إلى محادثة خاصة بك فقط.
+* **التوكن = كلمة سر البوت.** لا يُطبع في أي مكان ولا يُحفظ في المشروع. إن ظننت أنه تسرّب: أرسل `/revoke` إلى BotFather لإصدار توكن جديد.
+
+### الخطوة ١: إنشاء البوت من @BotFather (لغير المبرمج)
+1. افتح تيليجرام (الهاتف أو الكمبيوتر) وابحث عن **`@BotFather`** (الحساب الرسمي الذي بجانبه علامة التوثيق الزرقاء) وافتحه.
+2. اضغط **Start** ثم أرسل الأمر `/newbot`.
+3. اكتب **اسمًا** يظهر لبوتك (مثلًا: `Morning Digest`).
+4. اكتب **اسم مستخدم** فريدًا ينتهي بكلمة `bot` (مثلًا: `muhamed_morning_bot`).
+5. سيردّ عليك BotFather برسالة فيها سطر **Use this token to access the HTTP API** وتحته التوكن، شكله: `123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`. **انسخه** (اضغط عليه مطولًا أو كليك يمين ← Copy). لا ترسله لأحد.
+
+### الخطوة ٢: تجهيز ملف إعداداتك (على Windows PowerShell)
+افتح PowerShell داخل مجلد المشروع، وفعّل البيئة، وحدّد مجلد بياناتك:
+
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"     # لهذه النافذة فقط
+setx NOTEBOOKLM_LAB_DATA "E:\github\notebooklm\data"       # (مرة واحدة) ليبقى بعد إغلاق النافذة؛ يسري في نوافذ PowerShell الجديدة
+python -m notebooklm_lab config init                       # ينشئ ملف الإعدادات الفارغ داخل مجلد البيانات
+notepad "E:\github\notebooklm\data\notebooklm-lab.env"     # يفتحه بالمفكرة
+```
+في المفكرة ألصق التوكن بعد علامة `=` (بدون مسافات ولا علامات اقتباس) ثم احفظ (Ctrl+S):
+
+```text
+TELEGRAM_BOT_TOKEN=123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_CHAT_ID=
+NOTEBOOKLM_LAB_TELEGRAM_AUTO=
+```
+> هذا الملف **يبقى على جهازك** داخل مجلد البيانات وليس داخل المستودع، وصيغة `*.env` مستبعدة من Git ومن فحص الأسرار. بديل الملف: متغيرات البيئة `TELEGRAM_BOT_TOKEN` و`TELEGRAM_CHAT_ID` (وهي تتقدّم على الملف إن وُجدت).
+
+### الخطوة ٣: الحصول على رقم المحادثة (chat id)
+1. افتح بوتك الجديد في تيليجرام (ابحث عن اسم المستخدم الذي اخترته)، اضغط **Start**، وأرسل له أي رسالة مثل `hi`.
+2. في PowerShell:
+```powershell
+python -m notebooklm_lab telegram chat-id
+```
+سيطبع سطرًا مثل `TELEGRAM_CHAT_ID=123456789` — انسخ الرقم إلى ملف الإعدادات (المفكرة) أمام `TELEGRAM_CHAT_ID=` واحفظ. (الأمر يعرض أسماء المحادثات وأرقامها فقط، ولا يعرض نص رسائلك.)
+3. للتحقق وإرسال رسالة اختبار حقيقية:
+```powershell
+python -m notebooklm_lab telegram setup-check --send-test
+```
+
+### كيف أجرّبها؟ (أوامر PowerShell بالترتيب)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+
+python -m notebooklm_lab config show                          # يعرض ما هو مضبوط (التوكن مخفي)
+python -m notebooklm_lab telegram setup-check --send-test     # ✔ يجب أن تصلك رسالة اختبار
+python -m notebooklm_lab morning --sample --telegram          # تجربة كاملة ببيانات مثال: ملخص + ملف صوتي تجريبي (نغمة قصيرة)
+python -m notebooklm_lab telegram send --sample               # يعيد إرسال آخر نتيجة تجريبية
+python -m notebooklm_lab telegram send "E:\مسار\ملف.m4a" --caption "ملف تجريبي"   # يرسل ملفًا بعينه
+python -m notebooklm_lab morning --telegram                   # التشغيل الحقيقي (يحتاج تسجيل دخول NotebookLM)
+```
+* إذا كررت `morning --sample` يقول «لا روابط جديدة» لأن الروابط عولجت؛ لإعادة التجربة: `Remove-Item "E:\github\notebooklm\data\morning_state.sample.json"`.
+* **للإرسال التلقائي بعد كل تشغيل (بما فيه التشغيل المجدول):** اكتب `NOTEBOOKLM_LAB_TELEGRAM_AUTO=1` في ملف الإعدادات. ولإيقافه مؤقتًا في تشغيل واحد: `morning --no-telegram`.
+* إن وصلتك رسالة «تيليجرام مفعّل لكن TELEGRAM_BOT_TOKEN غير مضبوط» فمعناها أن الملف لم يُقرأ: تأكد أن مجلد البيانات هو نفسه (`NOTEBOOKLM_LAB_DATA` أو `--data-dir`).
+
+### مرجع الأوامر
+| الأمر | الوظيفة |
+|---|---|
+| `config init` / `config show` | ينشئ ملف الإعدادات الفارغ / يعرض القيم (الأسرار مخفية) |
+| `telegram setup-check [--send-test]` | يتحقق من التوكن والمحادثة وffmpeg ويرسل رسالة اختبار اختياريًا |
+| `telegram chat-id` | يعرض أرقام المحادثات التي راسلت البوت |
+| `telegram send [ملف] [--caption ..] [--run 2026-11-03] [--sample]` | يرسل ملفًا، أو (بدون ملف) آخر نتيجة صباحية: ملخص + بودكاست |
+| `morning --telegram` / `--no-telegram` | تفعيل/تعطيل الإرسال التلقائي لهذا التشغيل |
+
+رمز الخروج `5` = فشل تيليجرام (يستعمله أمر `telegram` فقط؛ لا يغيّر رموز `morning` أبدًا).
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -273,6 +379,9 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | `morning schedule/unschedule` لـ cron: تثبيت وإزالة فعليان على Linux | ✔ جُرّبا فعليًا (لكن لم يُراقَب تشغيل cron في موعده) |
 | `morning schedule --install` على **Windows** (`schtasks`) | ✘ لم يُجرَّب على Windows؛ الأمر المولَّد مغطى باختبارات نصية فقط |
 | الوضع الحقيقي مع **حساب Google فعلي** (إنشاء دفتر، رفع، بودكاست عربي) — ومنه `morning` الحقيقي | ✘ **لم يُجرَّب** — يحتاج تسجيل دخولك |
+| تيليجرام: المنطق كاملًا (تقسيم الرسائل، الملف الكبير، ضغط ffmpeg، حد المعدل، إخفاء التوكن، عدم كسر `morning` عند الفشل) مقابل **خادم تيليجرام محلي مزيّف** + استدعاءات مزيّفة | ✔ اختبارات pytest (ضغط ffmpeg الحقيقي جُرّب على Linux بملف WAV) |
+| تيليجرام: إرسال **حقيقي** عبر بوت من @BotFather إلى حسابك (`setup-check` و`chat-id` و`send` و`morning --telegram`) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
+| تيليجرام: ضغط ffmpeg على Windows لملف أكبر من 50MB | ✘ لم يُجرَّب على Windows |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -283,11 +392,13 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 
 ```
 src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
-                      morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron)
+                      morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron),
+                      telegram (الإرسال إلى تيليجرام), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي
 examples/             links.txt و sample_notes.md
 scripts/setup.ps1     إعداد Windows
+.env.example          أسماء متغيرات الإعدادات فقط (بدون قيم)
 ```
 
 ## ١٣. الترخيص
