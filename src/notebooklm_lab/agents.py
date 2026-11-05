@@ -23,9 +23,10 @@ def snippets(python: str = "") -> Dict[str, str]:
             "claude mcp list\n\n"
             "# Upstream also ships a Claude Code/agent *skill*:\n"
             "notebooklm skill install        # installs the skill from notebooklm-py\n\n"
-            "# This project's OWN small MCP server (tool: ask_all_notebooks - one question across all notebooks):\n"
-            f"claude mcp add notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
-            "# (to pin the data folder add:  -e NOTEBOOKLM_LAB_DATA=<your data folder>  before the --)\n"
+            "# This project's OWN small MCP server (tools: ask_vault_and_notebooks = Obsidian + NotebookLM in ONE answer,\n"
+            "# search_obsidian_vault, ask_all_notebooks). Options go BEFORE the name; the command comes after `--`:\n"
+            f"claude mcp add --transport stdio --env NOTEBOOKLM_LAB_DATA=<your data folder> notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
+            "# (OBSIDIAN_VAULT is read from <data folder>\\notebooklm-lab.env, or add:  --env OBSIDIAN_VAULT=<your vault folder>)\n"
         ),
         "codex": (
             "# Codex CLI - either run:\n"
@@ -38,12 +39,14 @@ def snippets(python: str = "") -> Dict[str, str]:
             "# Upstream's skill installer also writes the vendor-neutral Agent Skills folder\n"
             "# (~/.agents/skills/notebooklm); whether your Codex version reads it is not verified:\n"
             "notebooklm skill install\n\n"
-            "# This project's OWN small MCP server (tool: ask_all_notebooks):\n"
-            f"codex mcp add notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
+            "# This project's OWN small MCP server (tools: ask_vault_and_notebooks, search_obsidian_vault, ask_all_notebooks):\n"
+            f"codex mcp add --env NOTEBOOKLM_LAB_DATA=<your data folder> notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
             "# or in config.toml:\n"
             "[mcp_servers.notebooklm_lab]\n"
             f"command = '{py}'\n"
             "args = [\"-m\", \"notebooklm_lab.mcp_server\"]\n"
+            "[mcp_servers.notebooklm_lab.env]\n"
+            "NOTEBOOKLM_LAB_DATA = 'E:\\github\\notebooklm\\data'     # your data folder (TOML literal string)\n"
         ),
         "hermes": (
             "# Hermes Agent - add to ~/.hermes/config.yaml (single quotes keep Windows backslashes literal):\n"
@@ -53,9 +56,11 @@ def snippets(python: str = "") -> Dict[str, str]:
             "    args: [\"-m\", \"notebooklm.mcp\"]\n"
             "    timeout: 1300      # audio generation can take many minutes\n"
             "    connect_timeout: 60\n"
-            "  notebooklm_lab:          # this project's OWN small MCP server (tool: ask_all_notebooks)\n"
+            "  notebooklm_lab:          # this project's OWN small MCP server (ask_vault_and_notebooks, search_obsidian_vault, ask_all_notebooks)\n"
             f"    command: '{py}'\n"
             "    args: [\"-m\", \"notebooklm_lab.mcp_server\"]\n"
+            "    env:\n"
+            "      NOTEBOOKLM_LAB_DATA: 'E:\\github\\notebooklm\\data'   # your data folder\n"
             "    timeout: 600\n"
             "# then restart Hermes. Tools appear with the prefix mcp_notebooklm_*\n"
         ),

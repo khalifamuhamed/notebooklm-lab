@@ -13,13 +13,27 @@
 
 Upstream's server stays the main way to drive NotebookLM from an agent. In addition, **this repo ships one small MCP server
 of its own** for tools upstream lacks: `python -m notebooklm_lab.mcp_server` (also `python -m notebooklm_lab mcp-server`).
-It uses `fastmcp` (already installed through the pinned `notebooklm-py[mcp]`) and the same login. Current tool:
+It uses `fastmcp` (already installed through the pinned `notebooklm-py[mcp]`) and the same login. Tools:
+* `ask_vault_and_notebooks(question, match?, limit_notebooks=5, limit_notes=5, include_vault=true, include_notebooks=true, folder?)` - ONE question over the
+  user's **Obsidian vault** (ranked keyword search of `.md` notes, read-only, Arabic-normalised) AND the notebooks; returns ONE Arabic answer citing notes by file path
+  (`[ملاحظة n]`) and notebooks by name (`[k.n]`), saves a report under `<data dir>/ask-both/`. If one side is unavailable (no login, no vault) the other is still returned with a warning.
+* `search_obsidian_vault(query, limit=5, folder?)` - notes only; no login and no Google quota.
 * `ask_all_notebooks(question, match?, exclude?, limit=10, morning_only=false)` - asks one question across all (or title-filtered)
   notebooks, returns ONE combined Arabic answer naming the notebook of every part (cited, per-notebook citation numbers like `[2.1]`)
   and saves an HTML/MD/JSON report under `<data dir>/ask/`. Each notebook asked uses Google quota, hence the `limit` (max 30).
   Agents without MCP can call the CLI instead: `python -m notebooklm_lab ask-all "<question>" --json` (exit codes 0/2/3/4).
 `python -m notebooklm_lab agents all` prints registration snippets for both servers (names `notebooklm` and `notebooklm_lab`).
-If an agent starts the server without your shell environment, pass `NOTEBOOKLM_LAB_DATA` (e.g. `claude mcp add -e NOTEBOOKLM_LAB_DATA=<folder> ...`).
+If an agent starts the server without your shell environment, pass `NOTEBOOKLM_LAB_DATA` (the server then reads `OBSIDIAN_VAULT` from `<data>/notebooklm-lab.env`).
+Registering this repo's own server (the vault tools need `OBSIDIAN_VAULT`, see the README):
+```
+# Claude Code (options BEFORE the name, command after `--`)
+claude mcp add --transport stdio --env NOTEBOOKLM_LAB_DATA=<data folder> notebooklm_lab -- "<venv python>" -m notebooklm_lab.mcp_server
+# Codex
+codex mcp add --env NOTEBOOKLM_LAB_DATA=<data folder> notebooklm_lab -- "<venv python>" -m notebooklm_lab.mcp_server
+#   or ~/.codex/config.toml:  [mcp_servers.notebooklm_lab] command=..., args=[...]  +  [mcp_servers.notebooklm_lab.env] NOTEBOOKLM_LAB_DATA='<data folder>'
+# Hermes ~/.hermes/config.yaml:  mcp_servers: notebooklm_lab: {command: '<venv python>', args: ["-m","notebooklm_lab.mcp_server"], env: {NOTEBOOKLM_LAB_DATA: '<data folder>'}}
+```
+Syntax follows each product's published docs; not run against the products themselves.
 
 ## Prerequisites
 1. Follow the README install steps (venv with `requirements-dev.txt`).

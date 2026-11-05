@@ -242,12 +242,37 @@ def cmd_channels(a) -> int:
         return channels.EXIT_USAGE
 
 
+def _obsidian_search(a, base) -> int:
+    from . import obsidian, vault_search
+
+    try:
+        target = obsidian.resolve_target(base, a.vault, None)
+        res = vault_search.search(target.vault, " ".join(a.query), limit=a.limit, folder=a.folder)
+    except (obsidian.ObsidianError, ValueError) as exc:
+        print(f"✘ {exc}")
+        return 2
+    if a.json:
+        import json as _json
+        from dataclasses import asdict
+
+        print(_json.dumps(asdict(res), ensure_ascii=False, indent=2))
+        return 0
+    print(f"فُحص {res.files_scanned} ملف؛ كلمات البحث: {'، '.join(res.terms)}")
+    if not res.hits:
+        print("لا توجد ملاحظات مطابقة.")
+    for i, h in enumerate(res.hits, 1):
+        print(f"\n[{i}] {h.title}   (درجة {h.score})\n    {h.path}\n    {h.snippet}")
+    return 0
+
+
 def cmd_obsidian(a) -> int:
     from . import deliver, obsidian
 
     base = Path(a.data_dir) if a.data_dir else None
     if a.ob_cmd == "setup-check":
         return obsidian.setup_check(base, a.vault, a.subfolder)
+    if a.ob_cmd == "search":
+        return _obsidian_search(a, base)
     try:
         target = obsidian.resolve_target(base, a.vault, a.subfolder)
     except obsidian.ObsidianError as exc:
@@ -306,6 +331,56 @@ def cmd_ask_all(a) -> int:
     if a.open and res.report_dir:
         print(storage.open_path(Path(res.report_dir) / "report.html"))
     return askall.exit_code(res)
+
+
+def cmd_ask_both(a) -> int:
+    from . import askall, askboth
+
+    question = " ".join(a.question).strip()
+    if not question or a.limit_notebooks <= 0 or a.limit_notes <= 0 or a.timeout <= 0:
+        print("✘ اكتب سؤالًا، والحدود/المهلة أكبر من صفر / give a question; limits/timeout must be > 0")
+        return askboth.EXIT_USAGE
+    if a.no_vault and a.no_notebooks:
+        print("✘ لا يمكن تعطيل المصدرين معًا / cannot disable both sources")
+        return askboth.EXIT_USAGE
+    if a.sample:
+        from .sample_backend import SampleBackend
+
+        factory = SampleBackend
+        print("⚠ الوضع التجريبي (--sample): دفاتر NotebookLM مثال؛ ملاحظات Obsidian حقيقية إن ضبطتها. / SAMPLE notebooks", file=sys.stderr)
+    else:
+        from .real_backend import RealBackend
+
+        def factory():
+            return RealBackend(profile=a.profile)
+    base = Path(a.data_dir) if a.data_dir else None
+    log = (lambda m: print(m, file=sys.stderr)) if a.json else print
+    c = asyncio.run(askboth.run_combined(
+        question, backend_factory=factory, include_notebooks=not a.no_notebooks, include_vault=not a.no_vault, data_dir=base,
+        vault=a.vault, folder=a.folder, note_limit=a.limit_notes, timeout_s=a.timeout, mode="sample" if a.sample else "real",
+        flt=askall.Filters(match=a.match or [], exclude=a.exclude or [], morning_only=a.morning, limit=a.limit_notebooks), say=log))
+    code = askboth.exit_code(c)
+    for what, err in (("Obsidian", c.vault_error), ("NotebookLM", c.notebooks_error)):
+        if err:
+            print(f"⚠ {what}: {err}", file=sys.stderr if a.json else sys.stdout)
+    if code in (askboth.EXIT_LOGIN, askboth.EXIT_FAILED, askboth.EXIT_USAGE) and not (c.has_notes or c.has_notebook_answers):
+        if c.notebooks_login:
+            print("شغّل على جهازك:  python -m notebooklm_lab login   (أو استعمل --no-notebooks للبحث في Obsidian فقط، أو --sample)")
+        elif code == askboth.EXIT_USAGE:
+            print("لم أفحص أي مصدر: اضبط OBSIDIAN_VAULT (python -m notebooklm_lab obsidian setup-check) أو غيّر فلاتر الدفاتر.")
+        return code
+    root = Path(a.out).resolve() if a.out else askboth.reports_root(base, a.sample)
+    askboth.save_report(c, root)
+    if a.json:
+        import json as _json
+
+        print(_json.dumps(c.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print("\n" + askboth.render_markdown(c))
+        print(f"التقرير المحفوظ / saved report: {Path(c.report_dir) / 'report.html'}  (+ report.md, answer.json)")
+    if a.open:
+        print(storage.open_path(Path(c.report_dir) / "report.html"))
+    return code
 
 
 def cmd_mcp_server(a) -> int:
@@ -459,11 +534,16 @@ def build_parser() -> argparse.ArgumentParser:
     odd.add_argument("--vault", help="vault folder (default: $OBSIDIAN_VAULT)")
     odd.add_argument("--subfolder", help="sub-folder inside the vault (default: $OBSIDIAN_SUBFOLDER or NotebookLM)")
     obs.add_parser("setup-check", parents=[odd], help="check the vault folder is there and writable")
+    ose = obs.add_parser("search", parents=[odd], help="ranked keyword search of the vault's Markdown notes (read-only, no login)")
+    ose.add_argument("query", nargs="+")
+    ose.add_argument("--limit", type=int, default=5)
+    ose.add_argument("--folder", help="search only this sub-folder of the vault")
+    ose.add_argument("--json", action="store_true")
     osv = obs.add_parser("save", parents=[odd], help="save the latest (or --run) morning result as a Markdown note; never overwrites")
     osv.add_argument("--run", help="a morning run folder name such as 2026-11-03 (default: the latest)")
     osv.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
     osv.add_argument("--no-audio", action="store_true", help="do not copy the podcast into the vault (link to the original file)")
-    ob.set_defaults(fn=cmd_obsidian, sample=False, run=None, no_audio=False, vault=None, subfolder=None)
+    ob.set_defaults(fn=cmd_obsidian, sample=False, run=None, no_audio=False, vault=None, subfolder=None, json=False, folder=None, limit=5)
 
     aa = sub.add_parser("ask-all", help="ask ONE question across all (or filtered) notebooks -> one combined Arabic answer + HTML/MD report")
     aa.add_argument("question", nargs="+", help="the question (quotes optional)")
@@ -481,6 +561,25 @@ def build_parser() -> argparse.ArgumentParser:
     aa.add_argument("--json", action="store_true", help="print the structured answer as JSON (for agents/scripts)")
     aa.add_argument("--open", action="store_true", help="open the HTML report when done")
     aa.set_defaults(fn=cmd_ask_all)
+
+    ab = sub.add_parser("ask-both", help="ONE question -> your Obsidian notes + your NotebookLM notebooks -> one Arabic answer citing both")
+    ab.add_argument("question", nargs="+")
+    ab.add_argument("--vault", help="Obsidian vault folder (default: $OBSIDIAN_VAULT / settings file)")
+    ab.add_argument("--folder", help="search only this sub-folder of the vault")
+    ab.add_argument("--limit-notes", type=int, default=5, help="max notes to cite (default 5)")
+    ab.add_argument("--limit-notebooks", type=int, default=5, help="max notebooks to ask, newest first (default 5; each uses Google quota)")
+    ab.add_argument("--match", action="append", help="only notebooks whose title contains this text (repeatable)")
+    ab.add_argument("--exclude", action="append", help="skip notebooks whose title contains this text (repeatable)")
+    ab.add_argument("--morning", action="store_true", help="only the daily «ملخص صباحي» notebooks")
+    ab.add_argument("--no-notebooks", action="store_true", help="search only Obsidian (no login, no Google quota)")
+    ab.add_argument("--no-vault", action="store_true", help="ask only NotebookLM")
+    ab.add_argument("--timeout", type=float, default=180.0, help="seconds to wait per notebook")
+    ab.add_argument("--sample", action="store_true", help="offline sample notebooks (the Obsidian part is still your real vault)")
+    ab.add_argument("--profile", help="notebooklm-py login profile name")
+    ab.add_argument("--data-dir"), ab.add_argument("--out", help="folder for the report (default: <data>/ask-both)")
+    ab.add_argument("--json", action="store_true", help="print the structured answer as JSON")
+    ab.add_argument("--open", action="store_true", help="open the HTML report")
+    ab.set_defaults(fn=cmd_ask_both)
 
     ms_ = sub.add_parser("mcp-server", help="start this project's own MCP server (stdio): tool ask_all_notebooks")
     ms_.add_argument("--sample", action="store_true", help="offline sample notebooks")

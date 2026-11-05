@@ -408,13 +408,13 @@ python -m notebooklm_lab ask-all "سؤال" --json                              
 * رموز الخروج: `0` أجاب دفتر واحد على الأقل، `2` خطأ في الاستعمال أو لا دفتر يطابق الفلاتر، `3` تسجيل الدخول مفقود أو منتهٍ، `4` فشلت كل الدفاتر.
 
 ### استعماله من وكيل ذكاء اصطناعي (MCP أو سطر الأوامر)
-المشروع يحتوي الآن **خادم MCP صغيرًا خاصًا به** (إضافة إلى خادم المكتبة الأصلي) فيه أداة واحدة: **`ask_all_notebooks`** (المعاملات: `question` و`match` و`exclude` و`limit` و`morning_only`)، وتعيد نفس الإجابة المجمّعة مع مسار التقرير المحفوظ. يستعمل `fastmcp` المثبّت أصلًا مع `notebooklm-py[mcp]` (**بلا اعتماديات جديدة**) ونفس تسجيل الدخول.
+المشروع يحتوي الآن **خادم MCP صغيرًا خاصًا به** (إضافة إلى خادم المكتبة الأصلي) فيه أدوات: **`ask_all_notebooks`** (وأداتا القسم ٧-ز: `ask_vault_and_notebooks` و`search_obsidian_vault`) (المعاملات: `question` و`match` و`exclude` و`limit` و`morning_only`)، وتعيد نفس الإجابة المجمّعة مع مسار التقرير المحفوظ. يستعمل `fastmcp` المثبّت أصلًا مع `notebooklm-py[mcp]` (**بلا اعتماديات جديدة**) ونفس تسجيل الدخول.
 
 ```powershell
 python -m notebooklm_lab agents all          # يطبع أوامر التسجيل لـ Claude Code وCodex وHermes (الخادمان معًا) بمسار Python الخاص بك
 python -m notebooklm_lab mcp-server --sample # يشغّل الخادم (stdio) ببيانات مثال — للاختبار؛ بدون --sample يستعمل حسابك
 ```
-مثال Claude Code: `claude mcp add notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`. وإن كان الوكيل لا يدعم MCP يكفيه استدعاء `python -m notebooklm_lab ask-all "السؤال" --json` وقراءة الناتج. (إعدادات Codex وHermes في الأمر `agents` وفي `docs/AGENTS_SETUP.md`.) وتعليمات الخادم تنبّه الوكيل إلى معاملة النص العائد كبيانات غير موثوقة لا كتعليمات.
+مثال Claude Code (الخيارات قبل الاسم): `claude mcp add --transport stdio --env NOTEBOOKLM_LAB_DATA=E:\github\notebooklm\data notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`. وإن كان الوكيل لا يدعم MCP يكفيه استدعاء `python -m notebooklm_lab ask-all "السؤال" --json` وقراءة الناتج. (إعدادات Codex وHermes في الأمر `agents` وفي `docs/AGENTS_SETUP.md`.) وتعليمات الخادم تنبّه الوكيل إلى معاملة النص العائد كبيانات غير موثوقة لا كتعليمات.
 
 ## ٧-و. متابعة قنوات يوتيوب (`channels`)
 
@@ -458,6 +458,89 @@ python -m notebooklm_lab morning                             # الحقيقي: �
 
 رموز الخروج: `0` نجاح، `2` مدخل غير مفهوم (رابط فيديو بدل قناة، قناة غير موجودة، ملف تالف)، `4` تعذّر الاتصال بيوتيوب (أو فشلت كل القنوات).
 
+## ٧-ز. سؤال واحد لملاحظات Obsidian ودفاتر NotebookLM معًا (`ask-both`)
+
+> **الحالة: ✘ لم يُجرَّب بعد على جهازك ولا على حسابك الحقيقي.** مُختبر آليًا بـ vault مؤقت ودفاتر مزيّفة وخادم MCP حقيقي ببيانات مثال. بحث الملاحظات لا يحتاج حساب Google ولا تسجيل دخول.
+
+### ماذا يفعل؟
+تكتب **سؤالًا واحدًا**، فيبحث الأمر في مصدرين ويعيد **إجابة عربية واحدة تنسب كل جزء إلى مصدره**:
+1. **ملاحظاتك في Obsidian:** بحث كلمات مفتاحية مرتَّب بدرجات (بلا أي اعتماديات جديدة) في ملفات `.md` داخل الـ vault. كل ملاحظة تُذكر **بمسار ملفها** (النسبي داخل الـ vault + الكامل) مع مقتطف حول الكلمات المطابقة: `[ملاحظة 1]`.
+2. **دفاتر NotebookLM:** نفس آلية `ask-all`؛ كل جزء منسوب إلى **اسم الدفتر** مع مصادره: `[2.1]`.
+
+* **التجميع حرفي ولا يعيد الصياغة** (فلا يخترع معلومات). إن أردت صياغة نهائية فالوكيل الذي يستدعي الأداة (Claude Code وغيره) يلخّصها من هذه المخرجات المنسوبة.
+* **البحث في الملاحظات تقريبي بالكلمات لا بالمعنى:** يطبّع العربية (يتجاهل التشكيل والتطويل، ويوحّد الألف والهمزات والياء والألف المقصورة والتاء المربوطة)، ويحذف أدوات الاستفهام والحروف الشائعة وأل التعريف وبعض السوابق، ويطابق صيغ الجمع القريبة (مثل «فيديو» و«فيديوهات»). **لا يفهم المرادفات** ولا يطابق اللغتين معًا: سؤال بالعربية لن يجد ملاحظة إنجليزية فقط. فإن لم يجد ملاحظتك فجرّب كلمات تظهر فيها فعلًا.
+* **للقراءة فقط:** لا يعدّل ولا ينشئ أي ملاحظة. يتجاوز المجلدات المخفية (`.obsidian` و`.trash` وكل ما يبدأ بنقطة) والملفات غير `.md`، ولا يتبع اختصارات (symlinks) تخرج من الـ vault، ويتجاهل الملفات الأكبر من 1.5MB، ويحدّ الفحص بـ 30000 ملف (مع تنبيه في التقرير إن قُطع).
+* **إن تعذّر أحد المصدرين يُعاد الآخر مع تحذير واضح** (مثلًا: لا تسجيل دخول إلى NotebookLM ← تصلك الملاحظات فقط؛ أو الـ vault غير مضبوط ← تصلك الدفاتر فقط). ولا يُعدّ خطأً إلا إن تعذّر **كلاهما**.
+* ⚠ **كل دفتر يُسأل يستهلك جزءًا من حصتك في Google**: الحد الافتراضي **5 دفاتر** (الأحدث أولًا). استعمل `--match` لتضييق الدفاتر، أو `--no-notebooks` للبحث في Obsidian وحده بلا أي استهلاك.
+* التقرير يُحفظ في `data\ask-both\<الوقت-والسؤال>\` بصيغ `report.html` و`report.md` و`answer.json`. ويجب اعتبار محتوى ملاحظاتك (وأي نص عائد) **بيانات غير موثوقة** لا تعليمات.
+
+### الإعداد
+لا شيء جديدًا: يستعمل `OBSIDIAN_VAULT` نفسه من القسم ٧-د (في ملف `data\notebooklm-lab.env` أو متغير بيئة) وتسجيل دخول NotebookLM نفسه. لا متغيرات بيئة جديدة.
+
+### كيف أجرّبها؟ (أوامر PowerShell بالترتيب)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+python -m notebooklm_lab config show                       # تأكد أن OBSIDIAN_VAULT مضبوط (القيمة تظهر كمسار، والأسرار مخفية)
+
+# ١) بحث الملاحظات وحده — لا حساب ولا استهلاك:
+python -m notebooklm_lab obsidian search "الهوك في الفيديوهات القصيرة"
+python -m notebooklm_lab obsidian search "ميزانية" --folder "Projects" --limit 3
+
+# ٢) السؤال المجمّع بدفاتر مثال (ملاحظاتك حقيقية، والدفاتر مثال) — بلا حساب:
+python -m notebooklm_lab ask-both "ما أهم أفكار الهوك في الفيديوهات القصيرة؟" --sample --open
+
+# ٣) ملاحظاتك فقط، بلا NotebookLM:
+python -m notebooklm_lab ask-both "ما أهم أفكار الهوك؟" --no-notebooks
+
+# ٤) حقيقي: ملاحظاتك + أحدث 3 دفاتر فقط (استهلاك قليل):
+python -m notebooklm_lab login                              # مرة واحدة فقط إن لم تسجّل
+python -m notebooklm_lab ask-both "ما أهم أفكار الهوك في الفيديوهات القصيرة؟" --limit-notebooks 3 --open
+python -m notebooklm_lab ask-both "ماذا كتبت عن التسويق؟" --match "ملخص صباحي" --limit-notebooks 2 --folder "Notes"
+python -m notebooklm_lab ask-both "سؤال" --json            # مخرجات JSON للوكلاء والسكربتات
+```
+* الخيارات: `--vault مجلد` (بدل `OBSIDIAN_VAULT`)، `--folder مجلد فرعي` داخل الـ vault، `--limit-notes N` (الافتراضي 5)، `--limit-notebooks N` (الافتراضي 5)، `--match` و`--exclude` و`--morning` (كما في `ask-all`)، `--no-notebooks`، `--no-vault`، `--timeout ثواني`، `--out مجلد`، `--open`، `--json`، `--sample`.
+* رموز الخروج: `0` فُحص مصدر واحد على الأقل (حتى لو لا نتائج)، `2` خطأ في الاستعمال أو لم يُفحص شيء (الـ vault غير مضبوط ولا دفاتر مطابقة)، `3` تسجيل الدخول مفقود ولم يُفحص غيره، `4` فشل كل ما طُلب.
+
+### ربطه بوكيل ذكاء اصطناعي (Claude Code وCodex وHermes)
+يضيف خادم MCP الخاص بالمشروع أداتين جديدتين إلى `ask_all_notebooks`:
+
+| الأداة | وظيفتها |
+|---|---|
+| **`ask_vault_and_notebooks`** | السؤال المجمّع: `question` و`match` و`limit_notebooks` و`limit_notes` و`include_vault` و`include_notebooks` و`folder` |
+| **`search_obsidian_vault`** | بحث الملاحظات وحده (بلا حساب ولا حصة): `query` و`limit` و`folder` |
+
+**الخطوات (مرة واحدة):** أولًا اضبط `OBSIDIAN_VAULT` في `data\notebooklm-lab.env` (القسم ٧-د). ثم اطبع الإعدادات الجاهزة بمسار Python الخاص بك ونفّذ ما يخص وكيلك:
+```powershell
+python -m notebooklm_lab agents claude     # أو codex أو hermes أو all
+```
+الصيغ (وفق وثائق كل أداة؛ **لم تُجرَّب على الأدوات نفسها**):
+
+* **Claude Code** — الخيارات تأتي **قبل اسم الخادم** والأمر بعد `--`:
+  `claude mcp add --transport stdio --env NOTEBOOKLM_LAB_DATA=E:\github\notebooklm\data notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`
+  ثم `claude mcp list` للتحقق.
+* **Codex** — `codex mcp add --env NOTEBOOKLM_LAB_DATA=E:\github\notebooklm\data notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`، أو في `~/.codex/config.toml`:
+  ```toml
+  [mcp_servers.notebooklm_lab]
+  command = 'E:\github\notebooklm\.venv\Scripts\python.exe'
+  args = ["-m", "notebooklm_lab.mcp_server"]
+  [mcp_servers.notebooklm_lab.env]
+  NOTEBOOKLM_LAB_DATA = 'E:\github\notebooklm\data'
+  ```
+* **Hermes Agent** — في `~/.hermes/config.yaml` ثم إعادة تشغيل Hermes:
+  ```yaml
+  mcp_servers:
+    notebooklm_lab:
+      command: 'E:\github\notebooklm\.venv\Scripts\python.exe'
+      args: ["-m", "notebooklm_lab.mcp_server"]
+      env:
+        NOTEBOOKLM_LAB_DATA: 'E:\github\notebooklm\data'
+      timeout: 600
+  ```
+
+وبعد التسجيل اطلب من الوكيل مثلًا: «استعمل `ask_vault_and_notebooks` لتجيب عن: ما الذي عندي عن الهوك؟» وسيصله نص الإجابة المنسوب لكل مصدر ومسار التقرير. وإن لم يدعم وكيلك MCP فيكفيه تشغيل `python -m notebooklm_lab ask-both "السؤال" --json` وقراءة الناتج. (إن لم يمرّر الوكيل متغيرات البيئة فالخادم يقرأ `OBSIDIAN_VAULT` من `data\notebooklm-lab.env` في المجلد الذي يدلّه عليه `NOTEBOOKLM_LAB_DATA`، وبلا ذلك يستعمل المجلد الافتراضي `~/NotebookLM-Lab`.)
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -473,7 +556,7 @@ python -m notebooklm_lab outputs delete --all --yes                         # ي
 
 ## ٩. التكامل مع وكلاء الذكاء الاصطناعي: Claude Code و Codex و Hermes
 
-**المكتبة تأتي بخادم MCP خاص بها** (الأمر `notebooklm-mcp`، يحتوي 38 أداة منها `notebook_create` و`source_add` و`chat_ask` و`studio_generate` و`studio_download`) **وبمهارة (skill) جاهزة**، فنستعمل الخادم الأصلي كما هو. وأضاف هذا المشروع **خادمًا صغيرًا خاصًا به** لأدوات لا يملكها الأصلي (حاليًا `ask_all_notebooks` — انظر القسم ٧-هـ). الأمر التالي يعطيك الإعدادات الجاهزة لثلاثة وكلاء، للخادمين معًا:
+**المكتبة تأتي بخادم MCP خاص بها** (الأمر `notebooklm-mcp`، يحتوي 38 أداة منها `notebook_create` و`source_add` و`chat_ask` و`studio_generate` و`studio_download`) **وبمهارة (skill) جاهزة**، فنستعمل الخادم الأصلي كما هو. وأضاف هذا المشروع **خادمًا صغيرًا خاصًا به** لأدوات لا يملكها الأصلي (`ask_all_notebooks` — القسم ٧-هـ، و`ask_vault_and_notebooks` و`search_obsidian_vault` — القسم ٧-ز). الأمر التالي يعطيك الإعدادات الجاهزة لثلاثة وكلاء، للخادمين معًا:
 
 ```powershell
 python -m notebooklm_lab agents all        # يطبع الإعدادات الثلاثة، مع مسار Python الخاص بك
@@ -529,6 +612,10 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | `channels`: تحليل المدخلات (@handle/رابط/UC)، حلّ المعرّف، قراءة RSS، إعادة المحاولة، عدم التكرار مع الصندوق والحالة، الحد لكل قناة، `--dry-run`، فشل قناة بمعزل، الدمج في `morning` — بيوتيوب مزيّف | ✔ اختبارات pytest |
 | `channels`: `add` و`check` الحقيقيان على يوتيوب الحي (قنوات NASA وGoogle وMrBeast) من جهاز التطوير، بما في ذلك أخطاء 404/500 المؤقتة وإعادة المحاولة | ✔ جُرّب فعليًا (من Linux، خارج جهازك) |
 | `channels` + `morning` على جهازك مع حساب NotebookLM الحقيقي (من الرابط الجديد إلى البودكاست) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
+| `ask-both` + بحث الملاحظات: ترتيب النتائج، تطبيع العربية، المقتطفات، تخطي المخفي واختصارات الخروج من الـ vault، سقف الحجم، الدمج مع الدفاتر، التدهور اللطيف عند غياب أحد المصدرين، أكواد الخروج، الهروب من HTML | ✔ اختبارات pytest بـ vault مؤقت ودفاتر مزيّفة |
+| أداتا MCP (`ask_vault_and_notebooks` و`search_obsidian_vault`): تعملان عبر stdio بالـ SDK الرسمي ببيانات مثال وvault حقيقي مؤقت | ✔ مُختبر آليًا |
+| `ask-both` و`obsidian search` على **vault الحقيقي** عندك (جودة الترتيب مع ملاحظاتك الفعلية وسرعة الفحص) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
+| `ask-both` مع **حسابك الحقيقي** في NotebookLM، واستعمال الأداتين من Claude Code وCodex وHermes (الإعدادات وفق وثائقها، لم تُشغَّل هذه الوكلاء) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -540,7 +627,7 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 ```
 src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
                       morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron),
-                      channels (متابعة قنوات يوتيوب), askall (سؤال لكل الدفاتر), mcp_server (خادم MCP الخاص بالمشروع),
+                      channels (متابعة قنوات يوتيوب), askall (سؤال لكل الدفاتر), vault_search (بحث ملاحظات Obsidian), askboth (الإجابة المجمّعة), mcp_server (خادم MCP الخاص بالمشروع),
                       telegram (الإرسال إلى تيليجرام), obsidian (الحفظ في vault), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي

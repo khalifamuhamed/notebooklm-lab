@@ -46,5 +46,5 @@ def test_agents_snippets_cover_all_three():
 
     txt = agents.render("all", python="/opt/venv/bin/python")
     for needle in ("claude mcp add notebooklm", "codex mcp add notebooklm", "[mcp_servers.notebooklm]", "mcp_servers:", "notebooklm.mcp",
-                   "claude mcp add notebooklm_lab", "codex mcp add notebooklm_lab", "[mcp_servers.notebooklm_lab]", "notebooklm_lab:", "notebooklm_lab.mcp_server"):
+                   "--transport stdio --env NOTEBOOKLM_LAB_DATA=", "notebooklm_lab -- /opt/venv/bin/python", "[mcp_servers.notebooklm_lab.env]", "ask_vault_and_notebooks", "[mcp_servers.notebooklm_lab]", "notebooklm_lab:", "notebooklm_lab.mcp_server"):
         assert needle in txt

@@ -155,27 +155,18 @@ def _cite_line(k: int, c: dict) -> str:
     return f"[{k}.{c.get('number')}] {c.get('source_title')}" + (f" — «{text}»" if text else "")
 
 
-def render_markdown(res: AskAllResult) -> str:
-    L: List[str] = [f"# إجابة مجمّعة من دفاتر NotebookLM", "", f"**السؤال:** {res.question}", ""]
-    if res.mode == "sample":
-        L += ["> ⚠ وضع تجريبي: بيانات مثال وليست من NotebookLM.", ""]
-    useful, ok_empty = res.useful, [a for a in res.answers if a.ok and a.no_answer]
-    failed = [a for a in res.answers if not a.ok]
-    L += [f"سُئل {len(res.answers)} دفتر من أصل {res.total_notebooks}: أجاب {len(useful)} بمعلومات، "
-          f"{len(ok_empty)} بلا جواب مفيد، وفشل {len(failed)}.", ""]
-    L += ["> هذا تجميع حرفي لإجابات NotebookLM كل دفتر على حدة (لم يُعَد تلخيصها). كل جزء منسوب إلى دفتره، "
-          "ورقم الاستشهاد `[2.1]` = الدفتر 2 الاستشهاد 1.", ""]
-    L += ["## الإجابة المجمّعة", ""]
-    if not useful:
-        L += ["لم يجب أي دفتر بمعلومات مفيدة عن هذا السؤال.", ""]
+def answers_markdown(res: AskAllResult, h: str = "###") -> List[str]:
+    """The per-notebook answer blocks (each headed with its notebook name) + the «notebooks that did not help» list."""
+    L: List[str] = []
     for k, a in enumerate(res.answers, 1):
         if not a.ok or a.no_answer:
             continue
-        L += [f"### {k}. من دفتر «{a.notebook.title}»", "", renumber(a.answer, k), ""]
+        L += [f"{h} {k}. من دفتر «{a.notebook.title}»", "", renumber(a.answer, k), ""]
         if a.citations:
             L += ["**المصادر:**"] + [f"- {_cite_line(k, c)}" for c in a.citations] + [""]
+    ok_empty, failed = [a for a in res.answers if a.ok and a.no_answer], [a for a in res.answers if not a.ok]
     if ok_empty or failed or res.skipped:
-        L += ["## دفاتر لم تُفد", ""]
+        L += [f"{h[:-1] or '#'} دفاتر لم تُفد", ""]
         for k, a in enumerate(res.answers, 1):
             if a.ok and a.no_answer:
                 L.append(f"- {k}. «{a.notebook.title}» — لا تحتوي مصادره جوابًا عن السؤال")
@@ -183,6 +174,27 @@ def render_markdown(res: AskAllResult) -> str:
                 L.append(f"- {k}. «{a.notebook.title}» — فشل: {a.error}")
         L += [f"- «{t}» — لم يُسأل: {why}" for t, why in res.skipped]
         L.append("")
+    return L
+
+
+def summary_line(res: AskAllResult) -> str:
+    ok_empty = [a for a in res.answers if a.ok and a.no_answer]
+    failed = [a for a in res.answers if not a.ok]
+    return (f"سُئل {len(res.answers)} دفتر من أصل {res.total_notebooks}: أجاب {len(res.useful)} بمعلومات، "
+            f"{len(ok_empty)} بلا جواب مفيد، وفشل {len(failed)}.")
+
+
+def render_markdown(res: AskAllResult) -> str:
+    L: List[str] = [f"# إجابة مجمّعة من دفاتر NotebookLM", "", f"**السؤال:** {res.question}", ""]
+    if res.mode == "sample":
+        L += ["> ⚠ وضع تجريبي: بيانات مثال وليست من NotebookLM.", ""]
+    L += [summary_line(res), ""]
+    L += ["> هذا تجميع حرفي لإجابات NotebookLM كل دفتر على حدة (لم يُعَد تلخيصها). كل جزء منسوب إلى دفتره، "
+          "ورقم الاستشهاد `[2.1]` = الدفتر 2 الاستشهاد 1.", ""]
+    L += ["## الإجابة المجمّعة", ""]
+    if not res.useful:
+        L += ["لم يجب أي دفتر بمعلومات مفيدة عن هذا السؤال.", ""]
+    L += answers_markdown(res)
     L += [f"_أُنشئ في {res.created_at}. أداة غير رسمية مبنية فوق notebooklm-py، وغير مرتبطة بـ Google._", ""]
     return "\n".join(L)
 
@@ -195,22 +207,8 @@ def _para(text: str) -> str:
     return "<br>".join(_h(line) for line in text.splitlines())
 
 
-def render_html(res: AskAllResult) -> str:
-    useful, ok_empty = res.useful, [a for a in res.answers if a.ok and a.no_answer]
-    failed = [a for a in res.answers if not a.ok]
-    p: List[str] = ["<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>",
-                    "<meta name='viewport' content='width=device-width, initial-scale=1'>",
-                    f"<title>إجابة مجمّعة — NotebookLM Lab</title><style>{CSS}</style></head><body><div class='wrap'>",
-                    "<h1>إجابة مجمّعة من دفاتر NotebookLM</h1>",
-                    f"<div class='muted'>{_h(res.created_at)} · الوضع: <span class='badge'>{'تجريبي (Sample)' if res.mode == 'sample' else 'حقيقي (NotebookLM)'}</span></div>"]
-    if res.mode == "sample":
-        p.append("<div class='banner'>⚠ وضع تجريبي: بيانات مثال وليست من NotebookLM.</div>")
-    p.append(f"<div class='card'><b>السؤال:</b> {_para(res.question)}</div>")
-    p.append(f"<div class='card'>سُئل {len(res.answers)} دفتر من أصل {res.total_notebooks}: أجاب <b>{len(useful)}</b> بمعلومات، "
-             f"{len(ok_empty)} بلا جواب مفيد، وفشل {len(failed)}.<div class='muted'>تجميع حرفي لإجابات NotebookLM لكل دفتر (لم يُعَد تلخيصها). "
-             "رقم الاستشهاد [2.1] = الدفتر 2، الاستشهاد 1.</div></div><h2>الإجابة المجمّعة</h2>")
-    if not useful:
-        p.append("<div class='card muted'>لم يجب أي دفتر بمعلومات مفيدة عن هذا السؤال.</div>")
+def answers_html(res: AskAllResult) -> List[str]:
+    p: List[str] = []
     for k, a in enumerate(res.answers, 1):
         if not a.ok or a.no_answer:
             continue
@@ -218,8 +216,9 @@ def render_html(res: AskAllResult) -> str:
         for c in a.citations:
             p.append(f"<div class='cite'>{_h(_cite_line(k, c))}</div>")
         p.append("</div>")
+    ok_empty, failed = [a for a in res.answers if a.ok and a.no_answer], [a for a in res.answers if not a.ok]
     if ok_empty or failed or res.skipped:
-        p.append("<h2>دفاتر لم تُفد</h2><div class='card'><ul>")
+        p.append("<h3>دفاتر لم تُفد</h3><div class='card'><ul>")
         for k, a in enumerate(res.answers, 1):
             if a.ok and a.no_answer:
                 p.append(f"<li>{k}. «{_h(a.notebook.title)}» — لا تحتوي مصادره جوابًا عن السؤال</li>")
@@ -227,8 +226,28 @@ def render_html(res: AskAllResult) -> str:
                 p.append(f"<li>{k}. «{_h(a.notebook.title)}» — <span class='bad'>فشل: {_h(a.error)}</span></li>")
         p += [f"<li>«{_h(t)}» — لم يُسأل: {_h(why)}</li>" for t, why in res.skipped]
         p.append("</ul></div>")
-    p.append("<div class='muted'>أداة غير رسمية مبنية فوق notebooklm-py، وغير مرتبطة بـ Google.</div></div></body></html>")
-    return "".join(p)
+    return p
+
+
+def html_page(title: str, body: List[str]) -> str:
+    return ("<!doctype html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            f"<title>{_h(title)} — NotebookLM Lab</title><style>{CSS}</style></head><body><div class='wrap'>"
+            + "".join(body) + "<div class='muted'>أداة غير رسمية مبنية فوق notebooklm-py، وغير مرتبطة بـ Google.</div></div></body></html>")
+
+
+def render_html(res: AskAllResult) -> str:
+    p: List[str] = ["<h1>إجابة مجمّعة من دفاتر NotebookLM</h1>",
+                    f"<div class='muted'>{_h(res.created_at)} · الوضع: <span class='badge'>{'تجريبي (Sample)' if res.mode == 'sample' else 'حقيقي (NotebookLM)'}</span></div>"]
+    if res.mode == "sample":
+        p.append("<div class='banner'>⚠ وضع تجريبي: بيانات مثال وليست من NotebookLM.</div>")
+    p.append(f"<div class='card'><b>السؤال:</b> {_para(res.question)}</div>")
+    p.append(f"<div class='card'>{_h(summary_line(res))}<div class='muted'>تجميع حرفي لإجابات NotebookLM لكل دفتر (لم يُعَد تلخيصها). "
+             "رقم الاستشهاد [2.1] = الدفتر 2، الاستشهاد 1.</div></div><h2>الإجابة المجمّعة</h2>")
+    if not res.useful:
+        p.append("<div class='card muted'>لم يجب أي دفتر بمعلومات مفيدة عن هذا السؤال.</div>")
+    p += answers_html(res)
+    return html_page("إجابة مجمّعة", p)
 
 
 def _slug(text: str) -> str:

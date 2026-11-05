@@ -248,7 +248,7 @@ def test_mcp_server_lists_the_tool_with_arabic_friendly_description(tmp_path):
             return await c.list_tools()
 
     tools = {t.name: t for t in asyncio.run(go())}
-    assert set(tools) == {"ask_all_notebooks"}
+    assert {"ask_all_notebooks", "ask_vault_and_notebooks", "search_obsidian_vault"} == set(tools)
     t = tools["ask_all_notebooks"]
     schema = getattr(t, "input_schema", None) or t.inputSchema
     assert "question" in schema["properties"] and "ALL" in t.description
@@ -291,4 +291,4 @@ def test_mcp_server_over_stdio_with_sample_data(tmp_path):
                 return names, out.content[0].text
 
     names, text = asyncio.run(asyncio.wait_for(go(), 60))
-    assert names == ["ask_all_notebooks"] and "إجابة مجمّعة" in text
+    assert sorted(names) == ["ask_all_notebooks", "ask_vault_and_notebooks", "search_obsidian_vault"] and "إجابة مجمّعة" in text
