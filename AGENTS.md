@@ -19,6 +19,8 @@ python -m notebooklm_lab obsidian setup-check | save [--sample] [--no-audio]   #
 python -m notebooklm_lab morning --obsidian      # also save note + audio into the vault (or NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1)
 python -m notebooklm_lab ask-all "question" [--match T] [--limit N] [--sample] [--json]   # one question across all notebooks -> combined Arabic answer + report in <data>/ask
 python -m notebooklm_lab mcp-server [--sample]   # this repo's own MCP server (stdio), tool ask_all_notebooks
+python -m notebooklm_lab channels add @handle|URL | list | remove X | check [--dry-run]   # follow YouTube channels (public RSS) -> new links appended to inbox.txt; state <data>/channels.json
+python -m notebooklm_lab morning --channels|--no-channels   # channel check runs first by default when channels are followed (not in --sample unless --channels)
 python -m notebooklm_lab selfcheck --mcp         # pins, sample mode, .gitignore, secrets, MCP tools
 pytest -q
 ```
@@ -39,7 +41,8 @@ All credentials come from environment variables or the local, git-ignored `<data
 Optional deliveries after `morning` (`postrun.py`: Telegram, Obsidian) are opt-in, never raise, and never change the morning exit codes
 (0 ok, 2 usage, 3 login missing/expired, 4 all failed). `telegram` commands use exit 5 for Telegram failures.
 Obsidian (`obsidian.py`) writes plain files only, never overwrites/edits an existing note, never creates a missing vault, exit 6 on write problems.
-Tests must mock the network (`telegram._post`) — never call api.telegram.org.
+`channels.py` reads only public YouTube pages/feeds (no key, no login), retries YouTube's flaky feed 3x, and never raises into `morning`.
+Tests must mock the network (`telegram._post`, `channels.http_get`) — never call api.telegram.org or youtube.com from tests.
 
 ## Using NotebookLM from an agent
 For questions across ALL notebooks use this repo's tool `ask_all_notebooks` (MCP server `python -m notebooklm_lab.mcp_server`) or the CLI `ask-all ... --json`;

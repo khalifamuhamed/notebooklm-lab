@@ -19,6 +19,7 @@ KNOWN: Dict[str, "tuple[bool, str]"] = {
     "TELEGRAM_BOT_TOKEN": (True, "توكن بوت تيليجرام من @BotFather"),
     "TELEGRAM_CHAT_ID": (False, "رقم المحادثة التي ستصلها الرسائل"),
     "NOTEBOOKLM_LAB_TELEGRAM_AUTO": (False, "1 = أرسل نتيجة `morning` إلى تيليجرام تلقائيًا"),
+    "NOTEBOOKLM_LAB_CHANNELS_AUTO": (False, "0 = لا تفحص القنوات المتابَعة تلقائيًا قبل `morning` (الافتراضي: يفحصها إن وُجدت قنوات)"),
     "OBSIDIAN_VAULT": (False, "مسار مجلد vault في Obsidian (يجب أن يكون موجودًا)"),
     "OBSIDIAN_SUBFOLDER": (False, "المجلد الفرعي داخل الـ vault (الافتراضي NotebookLM)"),
     "NOTEBOOKLM_LAB_OBSIDIAN_AUTO": (False, "1 = احفظ نتيجة `morning` في Obsidian تلقائيًا"),

@@ -416,6 +416,48 @@ python -m notebooklm_lab mcp-server --sample # يشغّل الخادم (stdio) �
 ```
 مثال Claude Code: `claude mcp add notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`. وإن كان الوكيل لا يدعم MCP يكفيه استدعاء `python -m notebooklm_lab ask-all "السؤال" --json` وقراءة الناتج. (إعدادات Codex وHermes في الأمر `agents` وفي `docs/AGENTS_SETUP.md`.) وتعليمات الخادم تنبّه الوكيل إلى معاملة النص العائد كبيانات غير موثوقة لا كتعليمات.
 
+## ٧-و. متابعة قنوات يوتيوب (`channels`)
+
+> **الحالة:** المنطق مُختبر آليًا بيوتيوب مزيّف، **وجُرّب فعليًا على الإنترنت الحقيقي من جهاز التطوير** (حلّ `@handle` وقراءة RSS لقنوات عامة). ✘ **لم يُجرَّب بعد على جهازك من قِبل المستخدم**، ولا ضمن تشغيل `morning` الحقيقي بحساب NotebookLM.
+
+### ماذا يفعل؟
+تتابع قنوات يوتيوب تهمّك، وكل صباح (أو متى شئت) يجد الأمر **الفيديوهات الجديدة** ويضيف روابطها إلى `inbox.txt` — فيلتقطها الملخص الصباحي تلقائيًا. **لا يحتاج حساب يوتيوب ولا مفتاح API**: يقرأ خلاصة RSS العامة لكل قناة (`https://www.youtube.com/feeds/videos.xml?channel_id=...`)، ويحوّل `@handle` إلى معرّف القناة بقراءة صفحة القناة العامة.
+
+* **الجديد فقط:** عند إضافة قناة، تُعتبر فيديوهاتها الحالية «قديمة» ولا تُغرق الصندوق؛ يُضاف فقط ما يُنشر **بعد** الإضافة (أو أحدث N فيديو فورًا بـ `--backfill N`).
+* **بلا تكرار:** لا يُضاف رابط موجود في `inbox.txt` ولا رابط عالجه `morning` سابقًا، ولا فيديو سبق عرضه (حتى لو كُتب الرابط بصيغة `youtu.be`). كل رابط يُكتب مع تعليق باسم القناة وعنوان الفيديو: `https://www.youtube.com/watch?v=ID  # القناة: العنوان`.
+* **حماية حصتك:** أقصى **5 فيديوهات جديدة لكل قناة في الفحص الواحد** (`--max-per-channel`)؛ إن نشرت القناة أكثر تؤخذ الأحدث وتُتخطى الأقدم (يُذكر ذلك في المخرجات ولا تُعرض مرة أخرى). و`morning` نفسه يعالج 20 رابطًا كحد أقصى في التشغيل.
+* **أخطاء يوتيوب المؤقتة:** خلاصة RSS في يوتيوب تعطي أحيانًا خطأ 404/500 مؤقتًا لقنوات سليمة (لاحظناه فعليًا في الاختبار)؛ لذلك تُعاد المحاولة 3 مرات، وإن استمر الخطأ تبقى القناة في قائمتك وتُهيَّأ عند أول فحص ناجح (دون إغراق الصندوق بالقديم)، وقناة فاشلة لا توقف باقي القنوات.
+* **داخل `morning`:** **يعمل افتراضيًا** عند وجود قناة متابَعة واحدة على الأقل (إضافة القناة هي «التفعيل»؛ ولا شبكة ولا ضجيج إن لم تتابع أي قناة). لإيقافه: `morning --no-channels` لتشغيل واحد، أو `NOTEBOOKLM_LAB_CHANNELS_AUTO=0` في ملف الإعدادات. وفي `morning --sample` لا يعمل (حتى لا تُكتب روابط حقيقية من تجربة) إلا إذا كتبت `--channels`. فشله لا يوقف الملخص أبدًا.
+
+### كيف أجرّبها؟ (أوامر PowerShell بالترتيب)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+
+python -m notebooklm_lab channels add @NASA --backfill 2     # يتابع القناة، ويتيح أحدث فيديوهين للفحص الأول (للتجربة فقط)
+python -m notebooklm_lab channels add https://www.youtube.com/@TED   # رابط القناة أيضًا يصلح (أو https://www.youtube.com/channel/UC…)
+python -m notebooklm_lab channels list                       # القنوات، وآخر فحص، وآخر خطأ إن وُجد
+python -m notebooklm_lab channels check --dry-run            # يعرض ما سيُضاف دون أن يكتب شيئًا
+python -m notebooklm_lab channels check                      # يضيف الروابط الجديدة إلى inbox.txt
+notepad "E:\github\notebooklm\data\inbox.txt"                # شاهد الروابط المضافة (مع اسم القناة والعنوان)
+python -m notebooklm_lab morning --sample --channels         # تجربة الدمج: فحص القنوات ثم ملخص تجريبي لروابطها
+python -m notebooklm_lab channels remove @NASA               # إلغاء المتابعة (لا يحذف روابط أُضيفت سابقًا)
+python -m notebooklm_lab morning                             # الحقيقي: يفحص القنوات أولًا ثم يعالج الروابط الجديدة
+```
+* إن قال `check` إن لا جديد فهذا طبيعي إن لم تنشر القناة شيئًا منذ الإضافة؛ استعمل `--backfill 2` عند الإضافة لترى الآلية فورًا.
+* ملف المتابعة: `E:\github\notebooklm\data\channels.json` (حذفه = نسيان القنوات المتابَعة؛ لا يحتوي أسرارًا).
+
+| الأمر | الوظيفة |
+|---|---|
+| `channels add <@handle \| رابط \| UC…> [--backfill N]` | متابعة قناة |
+| `channels list` | عرض القنوات |
+| `channels remove <@handle \| UC… \| جزء من الاسم>` | إلغاء المتابعة |
+| `channels check [--dry-run] [--max-per-channel N]` | إضافة الجديد إلى `inbox.txt` |
+| `morning --channels` / `--no-channels` | فرض/منع فحص القنوات في هذا التشغيل |
+
+رموز الخروج: `0` نجاح، `2` مدخل غير مفهوم (رابط فيديو بدل قناة، قناة غير موجودة، ملف تالف)، `4` تعذّر الاتصال بيوتيوب (أو فشلت كل القنوات).
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -484,6 +526,9 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | `ask-all`: الفلاتر، التجميع مع اسم كل دفتر، إعادة ترقيم الاستشهادات، المهلة والتوازي، فشل دفتر واحد، تقرير HTML/MD/JSON (مع الهروب من HTML)، ورموز الخروج — بدفاتر وهمية وعميل مزيّف | ✔ اختبارات pytest |
 | خادم MCP الخاص بالمشروع (`ask_all_notebooks`): يبدأ عبر stdio ويُدرج الأداة ويُجيب ببيانات مثال (بالـ SDK الرسمي) | ✔ مُختبر |
 | `ask-all` على حسابك الحقيقي (سرعة الدفاتر الكثيرة، جودة الإجابات، استهلاك الحصة)، واستعمال أداة MCP من Claude Code/Codex/Hermes فعليًا | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
+| `channels`: تحليل المدخلات (@handle/رابط/UC)، حلّ المعرّف، قراءة RSS، إعادة المحاولة، عدم التكرار مع الصندوق والحالة، الحد لكل قناة، `--dry-run`، فشل قناة بمعزل، الدمج في `morning` — بيوتيوب مزيّف | ✔ اختبارات pytest |
+| `channels`: `add` و`check` الحقيقيان على يوتيوب الحي (قنوات NASA وGoogle وMrBeast) من جهاز التطوير، بما في ذلك أخطاء 404/500 المؤقتة وإعادة المحاولة | ✔ جُرّب فعليًا (من Linux، خارج جهازك) |
+| `channels` + `morning` على جهازك مع حساب NotebookLM الحقيقي (من الرابط الجديد إلى البودكاست) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -495,7 +540,7 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 ```
 src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
                       morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron),
-                      askall (سؤال لكل الدفاتر), mcp_server (خادم MCP الخاص بالمشروع),
+                      channels (متابعة قنوات يوتيوب), askall (سؤال لكل الدفاتر), mcp_server (خادم MCP الخاص بالمشروع),
                       telegram (الإرسال إلى تيليجرام), obsidian (الحفظ في vault), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي

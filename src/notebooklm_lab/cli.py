@@ -137,11 +137,22 @@ def cmd_morning(a) -> int:
         from .real_backend import RealBackend
 
         backend = RealBackend(profile=a.profile, timeouts={"audio": a.audio_timeout * 60.0})
+    _check_channels(a, paths)
     outcome = asyncio.run(run_morning(backend, paths, audio_timeout_min=a.audio_timeout, max_links=a.max_links, say=print))
     _post_actions(outcome, paths, a)
     if a.open and outcome.run_dir and (outcome.run_dir / "report.html").exists():
         print(storage.open_path(outcome.run_dir / "report.html"))
     return outcome.code
+
+
+def _check_channels(a, paths) -> None:
+    """Followed YouTube channels: new videos go into inbox.txt BEFORE the morning run reads it.
+    On by default once you follow a channel; skipped in --sample mode unless --channels is given; never fatal."""
+    from . import channels
+
+    if (a.sample and a.channels is None) or not channels.auto_enabled(a.channels, paths.base):
+        return
+    channels.check_safely(paths.base, print)
 
 
 def _post_actions(outcome, paths, a) -> None:
@@ -208,6 +219,27 @@ def cmd_telegram(a) -> int:
         rep = telegram.send_deliverable(token, chat, d)
     print(rep.summary())
     return 0 if rep.ok else telegram.EXIT_TELEGRAM
+
+
+def cmd_channels(a) -> int:
+    from . import channels
+
+    base = Path(a.data_dir) if a.data_dir else None
+    try:
+        if a.ch_cmd == "add":
+            return channels.add(a.target, base, backfill=a.backfill)
+        if a.ch_cmd == "remove":
+            return channels.remove(a.target, base)
+        if a.ch_cmd == "list":
+            print(channels.list_text(base))
+            return 0
+        if a.max_per_channel <= 0:
+            print("✘ --max-per-channel يجب أن يكون أكبر من صفر")
+            return channels.EXIT_USAGE
+        return channels.check(base, dry_run=a.dry_run, max_per_channel=a.max_per_channel)[0]
+    except channels.ChannelError as exc:
+        print(f"✘ {exc}")
+        return channels.EXIT_USAGE
 
 
 def cmd_obsidian(a) -> int:
@@ -366,6 +398,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="send the summary + podcast to Telegram after a run (default: only if NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)")
     m.add_argument("--obsidian", action=argparse.BooleanOptionalAction, default=None,
                    help="save the summary + podcast into your Obsidian vault after a run (default: only if NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1)")
+    m.add_argument("--channels", action=argparse.BooleanOptionalAction, default=None,
+                   help="check followed YouTube channels first (default: on if you follow any; off in --sample; NOTEBOOKLM_LAB_CHANNELS_AUTO=0 disables)")
     m.set_defaults(fn=cmd_morning, morning_cmd=None)
     # sub-actions share --data-dir/--sample; SUPPRESS keeps values given before the action word
     common = argparse.ArgumentParser(add_help=False)
@@ -400,6 +434,22 @@ def build_parser() -> argparse.ArgumentParser:
     tgd.add_argument("--run", help="a morning run folder name such as 2026-11-03 (default: the latest)")
     tgd.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
     tg.set_defaults(fn=cmd_telegram, sample=False, run=None, file=None, caption=None, send_test=False)
+
+    ch = sub.add_parser("channels", help="follow YouTube channels: new videos are added to inbox.txt (add / list / remove / check)")
+    ch.add_argument("--data-dir", default=None)
+    chs = ch.add_subparsers(dest="ch_cmd", required=True)
+    cdd = argparse.ArgumentParser(add_help=False)
+    cdd.add_argument("--data-dir", default=argparse.SUPPRESS)
+    ca = chs.add_parser("add", parents=[cdd], help="follow a channel by @handle, channel URL or UC… id")
+    ca.add_argument("target", help="@handle, https://www.youtube.com/@name, https://www.youtube.com/channel/UC…")
+    ca.add_argument("--backfill", type=int, default=0, help="also queue this many of the channel's latest videos now (default 0: only future videos)")
+    chs.add_parser("list", parents=[cdd], help="show followed channels")
+    cr = chs.add_parser("remove", parents=[cdd], help="stop following (by @handle, id, URL or part of the title)")
+    cr.add_argument("target")
+    cc = chs.add_parser("check", parents=[cdd], help="find new videos and append their links to inbox.txt")
+    cc.add_argument("--dry-run", action="store_true", help="show what would be added; write nothing")
+    cc.add_argument("--max-per-channel", type=int, default=5, help="max new videos taken per channel per check (default 5; older ones are skipped)")
+    ch.set_defaults(fn=cmd_channels, target=None, backfill=0, dry_run=False, max_per_channel=5)
 
     ob = sub.add_parser("obsidian", help="save the morning summary + podcast into an Obsidian vault (setup-check / save)")
     ob.add_argument("--data-dir", default=None)
