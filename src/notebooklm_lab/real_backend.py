@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from .backend import Backend
-from .models import QA, Citation, OutputFile, SourceInfo, SourceSpec
+from typing import List
+
+from .models import QA, Citation, NotebookInfo, OutputFile, SourceInfo, SourceSpec
 
 
 class LoginRequiredError(RuntimeError):
@@ -68,6 +70,18 @@ class RealBackend(Backend):
         nb = await self._client.notebooks.create(title)
         return nb.id
 
+    async def list_notebooks(self) -> List[NotebookInfo]:
+        nbs = await self._client.notebooks.list()
+        return [NotebookInfo(id=n.id, title=getattr(n, "title", "") or n.id, sources_count=int(getattr(n, "sources_count", 0) or 0)) for n in nbs]
+
+    async def _load_titles(self, notebook_id: str) -> None:
+        """Titles of an existing notebook's sources, so citations can name them (best effort)."""
+        try:
+            for src in await self._client.sources.list(notebook_id):
+                self._titles.setdefault(src.id, getattr(src, "title", None) or src.id)
+        except Exception:
+            pass
+
     async def add_source(self, notebook_id: str, spec: SourceSpec) -> SourceInfo:
         sources = self._client.sources
         if spec.kind == "file":
@@ -81,6 +95,8 @@ class RealBackend(Backend):
     # --- chat --------------------------------------------------------------
     async def ask(self, notebook_id: str, question: str, language: str) -> QA:
         result = await self._client.chat.ask(notebook_id, question)
+        if any((getattr(r, "source_id", "") or "") not in self._titles for r in getattr(result, "references", None) or []):
+            await self._load_titles(notebook_id)
         citations = []
         for ref in getattr(result, "references", None) or []:
             sid = getattr(ref, "source_id", "") or ""

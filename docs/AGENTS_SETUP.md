@@ -11,7 +11,15 @@
   `uvx` with an **unpinned** `notebooklm-py[mcp]`. Because this repo wants a **pinned** version, the snippets below launch the
   server from *your own virtual environment* instead.
 
-Because upstream already ships an MCP server and skill, **this repo does not contain its own MCP server.**
+Upstream's server stays the main way to drive NotebookLM from an agent. In addition, **this repo ships one small MCP server
+of its own** for tools upstream lacks: `python -m notebooklm_lab.mcp_server` (also `python -m notebooklm_lab mcp-server`).
+It uses `fastmcp` (already installed through the pinned `notebooklm-py[mcp]`) and the same login. Current tool:
+* `ask_all_notebooks(question, match?, exclude?, limit=10, morning_only=false)` - asks one question across all (or title-filtered)
+  notebooks, returns ONE combined Arabic answer naming the notebook of every part (cited, per-notebook citation numbers like `[2.1]`)
+  and saves an HTML/MD/JSON report under `<data dir>/ask/`. Each notebook asked uses Google quota, hence the `limit` (max 30).
+  Agents without MCP can call the CLI instead: `python -m notebooklm_lab ask-all "<question>" --json` (exit codes 0/2/3/4).
+`python -m notebooklm_lab agents all` prints registration snippets for both servers (names `notebooklm` and `notebooklm_lab`).
+If an agent starts the server without your shell environment, pass `NOTEBOOKLM_LAB_DATA` (e.g. `claude mcp add -e NOTEBOOKLM_LAB_DATA=<folder> ...`).
 
 ## Prerequisites
 1. Follow the README install steps (venv with `requirements-dev.txt`).
@@ -62,5 +70,6 @@ and use the Linux path.)
 * ✔ MCP server started over stdio with the official `mcp` Python SDK (2.3.0) and `list_tools` returned 38 tools — with no Google login
   (`python -m notebooklm_lab selfcheck --mcp`, and `tests/test_mcp_server.py`).
 * ✔ `notebooklm skill install` and `notebooklm mcp install claude-code --config-path <tmp>` ran against a temporary HOME.
+* ✔ This repo's own server (`notebooklm_lab.mcp_server`) was started over stdio with the official `mcp` SDK; `ask_all_notebooks` listed and called against sample data (`tests/test_askall.py`).
 * ✘ Not tested: Claude Code, Codex or Hermes themselves, and any tool call against a real notebook (no Google login on the build machine).
   The three snippets follow each product's published MCP configuration format.

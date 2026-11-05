@@ -6,7 +6,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from .models import QA, OutputFile, SourceInfo, SourceSpec
+from typing import List
+
+from .models import QA, NotebookInfo, OutputFile, SourceInfo, SourceSpec
 
 
 class Backend:
@@ -20,6 +22,10 @@ class Backend:
         return None
 
     async def create_notebook(self, title: str) -> str:
+        raise NotImplementedError
+
+    async def list_notebooks(self) -> List[NotebookInfo]:
+        """All notebooks of the account, most recent first."""
         raise NotImplementedError
 
     async def add_source(self, notebook_id: str, spec: SourceSpec) -> SourceInfo:

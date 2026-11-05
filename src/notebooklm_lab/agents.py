@@ -22,7 +22,10 @@ def snippets(python: str = "") -> Dict[str, str]:
             f"claude mcp add notebooklm -- {_q(py)} -m notebooklm.mcp\n"
             "claude mcp list\n\n"
             "# Upstream also ships a Claude Code/agent *skill*:\n"
-            "notebooklm skill install        # installs the skill from notebooklm-py\n"
+            "notebooklm skill install        # installs the skill from notebooklm-py\n\n"
+            "# This project's OWN small MCP server (tool: ask_all_notebooks - one question across all notebooks):\n"
+            f"claude mcp add notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
+            "# (to pin the data folder add:  -e NOTEBOOKLM_LAB_DATA=<your data folder>  before the --)\n"
         ),
         "codex": (
             "# Codex CLI - either run:\n"
@@ -34,7 +37,13 @@ def snippets(python: str = "") -> Dict[str, str]:
             "args = [\"-m\", \"notebooklm.mcp\"]\n\n"
             "# Upstream's skill installer also writes the vendor-neutral Agent Skills folder\n"
             "# (~/.agents/skills/notebooklm); whether your Codex version reads it is not verified:\n"
-            "notebooklm skill install\n"
+            "notebooklm skill install\n\n"
+            "# This project's OWN small MCP server (tool: ask_all_notebooks):\n"
+            f"codex mcp add notebooklm_lab -- {_q(py)} -m notebooklm_lab.mcp_server\n"
+            "# or in config.toml:\n"
+            "[mcp_servers.notebooklm_lab]\n"
+            f"command = '{py}'\n"
+            "args = [\"-m\", \"notebooklm_lab.mcp_server\"]\n"
         ),
         "hermes": (
             "# Hermes Agent - add to ~/.hermes/config.yaml (single quotes keep Windows backslashes literal):\n"
@@ -44,6 +53,10 @@ def snippets(python: str = "") -> Dict[str, str]:
             "    args: [\"-m\", \"notebooklm.mcp\"]\n"
             "    timeout: 1300      # audio generation can take many minutes\n"
             "    connect_timeout: 60\n"
+            "  notebooklm_lab:          # this project's OWN small MCP server (tool: ask_all_notebooks)\n"
+            f"    command: '{py}'\n"
+            "    args: [\"-m\", \"notebooklm_lab.mcp_server\"]\n"
+            "    timeout: 600\n"
             "# then restart Hermes. Tools appear with the prefix mcp_notebooklm_*\n"
         ),
     }

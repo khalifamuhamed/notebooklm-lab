@@ -95,6 +95,9 @@ class GuardedBackend(Backend):
     async def create_notebook(self, title):
         return await self.inner.create_notebook(title)
 
+    async def list_notebooks(self):
+        return await self.inner.list_notebooks()
+
     async def add_source(self, notebook_id, spec):
         try:
             return await asyncio.wait_for(self.inner.add_source(notebook_id, spec), self.source_timeout_s)

@@ -17,6 +17,8 @@ python -m notebooklm_lab telegram setup-check [--send-test] | chat-id | send [fi
 python -m notebooklm_lab morning --telegram      # also send summary + podcast to Telegram (or NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)
 python -m notebooklm_lab obsidian setup-check | save [--sample] [--no-audio]   # needs OBSIDIAN_VAULT (existing folder), OBSIDIAN_SUBFOLDER (default NotebookLM)
 python -m notebooklm_lab morning --obsidian      # also save note + audio into the vault (or NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1)
+python -m notebooklm_lab ask-all "question" [--match T] [--limit N] [--sample] [--json]   # one question across all notebooks -> combined Arabic answer + report in <data>/ask
+python -m notebooklm_lab mcp-server [--sample]   # this repo's own MCP server (stdio), tool ask_all_notebooks
 python -m notebooklm_lab selfcheck --mcp         # pins, sample mode, .gitignore, secrets, MCP tools
 pytest -q
 ```
@@ -40,6 +42,8 @@ Obsidian (`obsidian.py`) writes plain files only, never overwrites/edits an exis
 Tests must mock the network (`telegram._post`) — never call api.telegram.org.
 
 ## Using NotebookLM from an agent
+For questions across ALL notebooks use this repo's tool `ask_all_notebooks` (MCP server `python -m notebooklm_lab.mcp_server`) or the CLI `ask-all ... --json`;
+it costs Google quota per notebook, so narrow with `match`/`limit`. stdout of the MCP server is protocol-only: never print there.
 Prefer upstream's MCP server (`python -m notebooklm.mcp`, tools such as `notebook_create`, `source_add`,
 `chat_ask`, `studio_generate`/`studio_status`/`studio_download`) — see `docs/AGENTS_SETUP.md`.
 For the content-creator flow ("links → Arabic summary + audio overview + report") run the `digest` command.

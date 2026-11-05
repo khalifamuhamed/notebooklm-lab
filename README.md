@@ -379,6 +379,43 @@ python -m notebooklm_lab morning --telegram --obsidian        # الاثنان �
 
 رمز الخروج `6` = مشكلة كتابة في الـ vault (لأمر `obsidian` فقط).
 
+## ٧-هـ. سؤال واحد لكل دفاترك (`ask-all`)
+
+> **الحالة: ✘ لم يُجرَّب بعد على حسابك الحقيقي في NotebookLM.** مُختبر آليًا بدفاتر وهمية وعميل مزيّف (استدعاءات `notebooks.list` و`chat.ask` تطابق وثائق المكتبة، لكن لم تُنفَّذ أمام Google).
+
+### ماذا يفعل؟
+تكتب **سؤالًا واحدًا**، فيسأله الأمر لكل دفتر في حسابك (أو للدفاتر التي تختارها)، ثم يعيد **إجابة عربية مجمّعة** يظهر فيها **اسم الدفتر الذي جاء منه كل جزء** مع مصادره، ويحفظ **تقريرًا HTML وMarkdown** (+ `answer.json`) في `data\ask\<الوقت-والسؤال>\`.
+
+* كل دفتر يجيب بنفسه من **مصادره هو** (مع استشهادات)؛ والتجميع **نصّي حرفي ولا يعيد صياغة شيء** (فلا يخترع معلومات). أرقام الاستشهاد تُعاد ترقيمها: `[2.1]` = الدفتر 2، الاستشهاد 1.
+* الدفاتر التي تقول إن مصادرها لا تتناول السؤال تُجمع في قسم «دفاتر لم تُفد» بدل أن تُغرق الإجابة (هذا الكشف **تقريبي**: يعتمد على عبارات مثل «لا تحتوي المصادر»؛ والإجابات الطويلة تُحتفظ بها دائمًا).
+* دفتر فشل أو تأخّر (مهلة 180 ثانية افتراضيًا) يُذكر في التقرير ولا يُفقد الباقي.
+* ⚠ **كل دفتر يُسأل يستهلك جزءًا من حصتك في Google**؛ لذلك الحد الافتراضي **10 دفاتر** (الأحدث أولًا) ويُستثنى الدفتر الذي بلا مصادر. استعمل `--match` لتضييق البحث.
+
+### كيف أجرّبها؟ (أوامر PowerShell بالترتيب)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+
+python -m notebooklm_lab ask-all "ما أهم أفكار الهوك في الفيديوهات القصيرة؟" --sample --open   # تجربة بدفاتر مثال، بلا حساب
+python -m notebooklm_lab login                                                                  # مرة واحدة فقط إن لم تسجّل
+python -m notebooklm_lab ask-all "ما أهم أفكار الهوك في الفيديوهات القصيرة؟" --limit 3 --open   # حقيقي: أحدث 3 دفاتر فقط (استهلاك قليل)
+python -m notebooklm_lab ask-all "ماذا قيل عن الذكاء الاصطناعي؟" --match "ملخص صباحي" --limit 5 # دفاتر عناوينها تحتوي هذه الكلمة
+python -m notebooklm_lab ask-all "ماذا قيل عن التسويق؟" --morning --exclude "2026-10"             # دفاتر الملخص الصباحي فقط عدا شهر
+python -m notebooklm_lab ask-all "سؤال" --json                                                  # مخرجات JSON للوكلاء والسكربتات
+```
+* الخيارات: `--match نص` و`--exclude نص` (يتكرران، بحث غير حساس لحالة الأحرف في **عنوان** الدفتر)، `--id` (معرّف دفتر)، `--morning`، `--limit N`، `--include-empty`، `--timeout ثواني`، `--out مجلد`، `--open`.
+* رموز الخروج: `0` أجاب دفتر واحد على الأقل، `2` خطأ في الاستعمال أو لا دفتر يطابق الفلاتر، `3` تسجيل الدخول مفقود أو منتهٍ، `4` فشلت كل الدفاتر.
+
+### استعماله من وكيل ذكاء اصطناعي (MCP أو سطر الأوامر)
+المشروع يحتوي الآن **خادم MCP صغيرًا خاصًا به** (إضافة إلى خادم المكتبة الأصلي) فيه أداة واحدة: **`ask_all_notebooks`** (المعاملات: `question` و`match` و`exclude` و`limit` و`morning_only`)، وتعيد نفس الإجابة المجمّعة مع مسار التقرير المحفوظ. يستعمل `fastmcp` المثبّت أصلًا مع `notebooklm-py[mcp]` (**بلا اعتماديات جديدة**) ونفس تسجيل الدخول.
+
+```powershell
+python -m notebooklm_lab agents all          # يطبع أوامر التسجيل لـ Claude Code وCodex وHermes (الخادمان معًا) بمسار Python الخاص بك
+python -m notebooklm_lab mcp-server --sample # يشغّل الخادم (stdio) ببيانات مثال — للاختبار؛ بدون --sample يستعمل حسابك
+```
+مثال Claude Code: `claude mcp add notebooklm_lab -- "E:\github\notebooklm\.venv\Scripts\python.exe" -m notebooklm_lab.mcp_server`. وإن كان الوكيل لا يدعم MCP يكفيه استدعاء `python -m notebooklm_lab ask-all "السؤال" --json` وقراءة الناتج. (إعدادات Codex وHermes في الأمر `agents` وفي `docs/AGENTS_SETUP.md`.) وتعليمات الخادم تنبّه الوكيل إلى معاملة النص العائد كبيانات غير موثوقة لا كتعليمات.
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -394,7 +431,7 @@ python -m notebooklm_lab outputs delete --all --yes                         # ي
 
 ## ٩. التكامل مع وكلاء الذكاء الاصطناعي: Claude Code و Codex و Hermes
 
-**المكتبة تأتي بخادم MCP خاص بها** (الأمر `notebooklm-mcp`، يحتوي 38 أداة منها `notebook_create` و`source_add` و`chat_ask` و`studio_generate` و`studio_download`) **وبمهارة (skill) جاهزة**، لذلك **لم أكتب خادم MCP خاصًا بي**؛ نستعمل الخادم الأصلي كما هو، وهذا المشروع يعطيك الإعدادات الجاهزة لثلاثة وكلاء:
+**المكتبة تأتي بخادم MCP خاص بها** (الأمر `notebooklm-mcp`، يحتوي 38 أداة منها `notebook_create` و`source_add` و`chat_ask` و`studio_generate` و`studio_download`) **وبمهارة (skill) جاهزة**، فنستعمل الخادم الأصلي كما هو. وأضاف هذا المشروع **خادمًا صغيرًا خاصًا به** لأدوات لا يملكها الأصلي (حاليًا `ask_all_notebooks` — انظر القسم ٧-هـ). الأمر التالي يعطيك الإعدادات الجاهزة لثلاثة وكلاء، للخادمين معًا:
 
 ```powershell
 python -m notebooklm_lab agents all        # يطبع الإعدادات الثلاثة، مع مسار Python الخاص بك
@@ -444,6 +481,9 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | تيليجرام: ضغط ffmpeg على Windows لملف أكبر من 50MB | ✘ لم يُجرَّب على Windows |
 | Obsidian: كتابة الملاحظة وfrontmatter (يُفحص بمفسّر YAML) وتضمين الصوت، وعدم الاستبدال أبدًا، ورفض المسارات الخارجة عن الـ vault، وعدم كسر `morning` | ✔ اختبارات pytest على مجلدات مؤقتة |
 | Obsidian: فتح الملاحظة فعليًا في برنامج Obsidian وتشغيل الصوت داخلها، وكتابة `morning --obsidian` الحقيقي على vault على جهازك | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
+| `ask-all`: الفلاتر، التجميع مع اسم كل دفتر، إعادة ترقيم الاستشهادات، المهلة والتوازي، فشل دفتر واحد، تقرير HTML/MD/JSON (مع الهروب من HTML)، ورموز الخروج — بدفاتر وهمية وعميل مزيّف | ✔ اختبارات pytest |
+| خادم MCP الخاص بالمشروع (`ask_all_notebooks`): يبدأ عبر stdio ويُدرج الأداة ويُجيب ببيانات مثال (بالـ SDK الرسمي) | ✔ مُختبر |
+| `ask-all` على حسابك الحقيقي (سرعة الدفاتر الكثيرة، جودة الإجابات، استهلاك الحصة)، واستعمال أداة MCP من Claude Code/Codex/Hermes فعليًا | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -455,6 +495,7 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 ```
 src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
                       morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron),
+                      askall (سؤال لكل الدفاتر), mcp_server (خادم MCP الخاص بالمشروع),
                       telegram (الإرسال إلى تيليجرام), obsidian (الحفظ في vault), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي

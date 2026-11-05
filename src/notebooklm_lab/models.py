@@ -25,6 +25,15 @@ class SourceInfo:
 
 
 @dataclass
+class NotebookInfo:
+    """One of the user's existing notebooks (for questions across all notebooks)."""
+
+    id: str
+    title: str
+    sources_count: int = 0
+
+
+@dataclass
 class Citation:
     number: int
     source_id: str

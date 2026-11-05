@@ -231,6 +231,57 @@ def cmd_obsidian(a) -> int:
     return 0 if rep.status in ("saved", "exists") else obsidian.EXIT_OBSIDIAN
 
 
+def cmd_ask_all(a) -> int:
+    from . import askall
+    from .real_backend import LoginRequiredError
+
+    question = " ".join(a.question).strip()
+    if not question or a.limit <= 0 or a.timeout <= 0:
+        print("✘ اكتب سؤالًا، و--limit/--timeout أكبر من صفر / give a question; --limit and --timeout must be > 0")
+        return askall.EXIT_USAGE
+    if a.sample:
+        from .sample_backend import SampleBackend
+
+        backend = SampleBackend()
+        print("⚠ الوضع التجريبي (--sample): دفاتر مثال، بدون اتصال بـ NotebookLM. / SAMPLE MODE", file=sys.stderr)
+    else:
+        from .real_backend import RealBackend
+
+        backend = RealBackend(profile=a.profile)
+    flt = askall.Filters(match=a.match or [], exclude=a.exclude or [], ids=a.id or [], morning_only=a.morning, limit=a.limit,
+                         include_empty=a.include_empty)
+    root = Path(a.out).resolve() if a.out else askall.reports_root(Path(a.data_dir) if a.data_dir else None, a.sample)
+    log = (lambda m: print(m, file=sys.stderr)) if a.json else print
+    try:
+        res = asyncio.run(askall.run_ask_all(backend, question, flt, root, timeout_s=a.timeout, say=log))
+    except Exception as exc:
+        if isinstance(exc, LoginRequiredError) or askall.looks_like_auth_problem(exc):
+            print(f"\n✘ {exc if isinstance(exc, LoginRequiredError) else 'انتهت صلاحية تسجيل الدخول'}\n"
+                  "شغّل على جهازك:  python -m notebooklm_lab login   (أو جرّب --sample بدون حساب)")
+            return askall.EXIT_LOGIN
+        print(f"✘ فشل / failed: {type(exc).__name__}: {str(exc)[:300]}")
+        return askall.EXIT_FAILED
+    if not res.answers:
+        print("لم يطابق أي دفتر الفلاتر (أو لا توجد دفاتر). جرّب --match بكلمة أخرى أو --include-empty. / No notebook matched.")
+        return askall.EXIT_USAGE
+    if a.json:
+        import json as _json
+
+        print(_json.dumps(res.to_dict(), ensure_ascii=False, indent=2))
+    else:
+        print("\n" + askall.render_markdown(res))
+        print(f"التقرير المحفوظ / saved report: {Path(res.report_dir) / 'report.html'}  (+ report.md, answer.json)")
+    if a.open and res.report_dir:
+        print(storage.open_path(Path(res.report_dir) / "report.html"))
+    return askall.exit_code(res)
+
+
+def cmd_mcp_server(a) -> int:
+    from . import mcp_server
+
+    return mcp_server.main(["--sample"] if a.sample else [])
+
+
 def cmd_session(a) -> int:
     if a.action == "where":
         print(storage.session_report(a.profile))
@@ -363,6 +414,27 @@ def build_parser() -> argparse.ArgumentParser:
     osv.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
     osv.add_argument("--no-audio", action="store_true", help="do not copy the podcast into the vault (link to the original file)")
     ob.set_defaults(fn=cmd_obsidian, sample=False, run=None, no_audio=False, vault=None, subfolder=None)
+
+    aa = sub.add_parser("ask-all", help="ask ONE question across all (or filtered) notebooks -> one combined Arabic answer + HTML/MD report")
+    aa.add_argument("question", nargs="+", help="the question (quotes optional)")
+    aa.add_argument("--match", action="append", help="only notebooks whose title contains this text (repeatable)")
+    aa.add_argument("--exclude", action="append", help="skip notebooks whose title contains this text (repeatable)")
+    aa.add_argument("--id", action="append", help="only this notebook id (repeatable)")
+    aa.add_argument("--morning", action="store_true", help="only the daily «ملخص صباحي» notebooks")
+    aa.add_argument("--limit", type=int, default=10, help="max notebooks to ask, newest first (default 10; each uses your Google quota)")
+    aa.add_argument("--include-empty", action="store_true", help="also ask notebooks that have no sources")
+    aa.add_argument("--timeout", type=float, default=180.0, help="seconds to wait per notebook (default 180)")
+    aa.add_argument("--sample", action="store_true", help="offline sample notebooks instead of your real account")
+    aa.add_argument("--profile", help="notebooklm-py login profile name")
+    aa.add_argument("--data-dir", help="data folder; reports go to <data>/ask/")
+    aa.add_argument("--out", help="folder for the report (default: <data>/ask)")
+    aa.add_argument("--json", action="store_true", help="print the structured answer as JSON (for agents/scripts)")
+    aa.add_argument("--open", action="store_true", help="open the HTML report when done")
+    aa.set_defaults(fn=cmd_ask_all)
+
+    ms_ = sub.add_parser("mcp-server", help="start this project's own MCP server (stdio): tool ask_all_notebooks")
+    ms_.add_argument("--sample", action="store_true", help="offline sample notebooks")
+    ms_.set_defaults(fn=cmd_mcp_server)
 
     s = sub.add_parser("session", help="where is my Google login session stored / delete it")
     s.add_argument("action", choices=["where", "delete"]), s.add_argument("--yes", action="store_true"), s.add_argument("--profile")

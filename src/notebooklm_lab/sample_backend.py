@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .backend import Backend
-from .models import QA, Citation, OutputFile, SourceInfo, SourceSpec
+from .models import QA, Citation, NotebookInfo, OutputFile, SourceInfo, SourceSpec
 
 SAMPLE_BANNER_AR = "⚠ بيانات تجريبية: هذا المحتوى مثال مكتوب مسبقًا داخل المشروع، وليس ناتجًا من NotebookLM."
 SAMPLE_BANNER_EN = "SAMPLE DATA - pre-written example content from this repo, NOT produced by NotebookLM."
@@ -36,6 +36,17 @@ def _tone_wav(path: Path, seconds: float = 2.0, rate: int = 8000) -> None:
         w.writeframes(bytes(frames))
 
 
+#: (id, title, sources, pre-written answer) - "existing notebooks" for the offline search-all demo. EXAMPLE DATA.
+SAMPLE_NOTEBOOKS = [
+    ("sample-nb-1", "[عينة] ملخص صباحي 2026-11-01", 3,
+     "[عينة] تشير المصادر إلى أن البداية القوية في أول ثلاث ثوانٍ ترفع نسبة المشاهدة [1]."),
+    ("sample-nb-2", "[عينة] أبحاث الخوارزميات", 5,
+     "[عينة] لا تحتوي المصادر في هذا الدفتر على معلومات عن هذا الموضوع."),
+    ("sample-nb-3", "[عينة] ملاحظات صانع المحتوى", 2,
+     "[عينة] توصي الملاحظات بتحويل كل فكرة إلى سلسلة مقاطع قصيرة مع تكرار الرسالة الأساسية [1]."),
+]
+
+
 class SampleBackend(Backend):
     mode = "sample"
     library_version = "sample (notebooklm-py not used)"
@@ -45,6 +56,9 @@ class SampleBackend(Backend):
 
     async def create_notebook(self, title: str) -> str:
         return "sample-notebook-0001"
+
+    async def list_notebooks(self) -> List[NotebookInfo]:
+        return [NotebookInfo(nid, title, n) for nid, title, n, _a in SAMPLE_NOTEBOOKS]
 
     async def add_source(self, notebook_id: str, spec: SourceSpec) -> SourceInfo:
         n = len(self._sources) + 1
@@ -60,6 +74,11 @@ class SampleBackend(Backend):
         return Citation(number=n, source_id=sid, source_title=title, text=text)
 
     async def ask(self, notebook_id: str, question: str, language: str) -> QA:
+        known = {nid: (title, ans) for nid, title, _n, ans in SAMPLE_NOTEBOOKS}
+        if notebook_id in known:  # a pre-written "existing notebook" for the search-all demo
+            title, ans = known[notebook_id]
+            src = f"[عينة] مصدر في «{title}»"
+            return QA(question=question, answer=ans, citations=[Citation(1, f"{notebook_id}-src", src, "(مقتطف تجريبي) نص مثال من المصدر.")] if "[1]" in ans else [])
         answer = (
             "[عينة] هذه إجابة تجريبية مكتوبة مسبقًا. تُظهر الأفكار الرئيسية في المصادر أن الجمهور "
             "يتفاعل مع البدايات القوية [1] وأن التكرار المنظّم للرسالة يرفع التذكّر [2]، "
