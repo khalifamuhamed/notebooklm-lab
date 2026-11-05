@@ -15,6 +15,8 @@ python -m notebooklm_lab morning status | schedule --time 07:30 [--install] | un
 python -m notebooklm_lab config init|show        # private settings file <data>/notebooklm-lab.env (git-ignored; names in .env.example)
 python -m notebooklm_lab telegram setup-check [--send-test] | chat-id | send [file] [--sample]   # needs TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 python -m notebooklm_lab morning --telegram      # also send summary + podcast to Telegram (or NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)
+python -m notebooklm_lab obsidian setup-check | save [--sample] [--no-audio]   # needs OBSIDIAN_VAULT (existing folder), OBSIDIAN_SUBFOLDER (default NotebookLM)
+python -m notebooklm_lab morning --obsidian      # also save note + audio into the vault (or NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1)
 python -m notebooklm_lab selfcheck --mcp         # pins, sample mode, .gitignore, secrets, MCP tools
 pytest -q
 ```
@@ -32,8 +34,9 @@ pytest -q
 ## Credentials and settings
 All credentials come from environment variables or the local, git-ignored `<data dir>/notebooklm-lab.env`
 (`src/notebooklm_lab/settings.py`; env wins over the file). Never hard-code, print or commit a token; `.env.example` lists names only.
-Optional deliveries after `morning` (`postrun.py`: Telegram) are opt-in, never raise, and never change the morning exit codes
+Optional deliveries after `morning` (`postrun.py`: Telegram, Obsidian) are opt-in, never raise, and never change the morning exit codes
 (0 ok, 2 usage, 3 login missing/expired, 4 all failed). `telegram` commands use exit 5 for Telegram failures.
+Obsidian (`obsidian.py`) writes plain files only, never overwrites/edits an existing note, never creates a missing vault, exit 6 on write problems.
 Tests must mock the network (`telegram._post`) — never call api.telegram.org.
 
 ## Using NotebookLM from an agent

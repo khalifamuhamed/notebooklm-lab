@@ -358,10 +358,10 @@ def status_text(paths: Paths) -> str:
         lines.append(f"آخر نجاح / last success: {succ.get('at')}  —  روابط ناجحة: {succ.get('links_ok', 0)}، فاشلة: {succ.get('links_failed', 0)}")
         lines.append(f"  المجلد / folder: {succ.get('folder')}")
         lines.append(f"  ملفات: {', '.join(succ.get('outputs_ok', [])) or '-'}" + (f"   لم تُنشأ: {', '.join(succ['outputs_failed'])}" if succ.get("outputs_failed") else ""))
-    for name, label in (("telegram", "تيليجرام"),):
+    for name, label in (("telegram", "تيليجرام"), ("obsidian", "Obsidian")):
         dv = (last or {}).get("delivery", {}).get(name) if last else None
         if dv:
-            st = {"sent": "أُرسل ✔", "failed": "فشل ✘", "not_configured": "غير مضبوط", "skipped": "تُخطّي"}.get(dv.get("status"), dv.get("status"))
+            st = {"sent": "أُرسل ✔", "failed": "فشل ✘", "not_configured": "غير مضبوط", "skipped": "تُخطّي", "saved": "حُفظ ✔", "exists": "موجود مسبقًا (لم يُلمس)"}.get(dv.get("status"), dv.get("status"))
             lines.append(f"  {label}: {st}" + (f" — {dv['error']}" if dv.get("error") else ""))
     proc = state.get("processed", {})
     n_ok = sum(1 for v in proc.values() if v.get("status") == "ok")

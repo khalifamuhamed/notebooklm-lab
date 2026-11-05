@@ -319,6 +319,66 @@ python -m notebooklm_lab morning --telegram                   # التشغيل �
 
 رمز الخروج `5` = فشل تيليجرام (يستعمله أمر `telegram` فقط؛ لا يغيّر رموز `morning` أبدًا).
 
+## ٧-د. الحفظ في Obsidian (`obsidian`)
+
+> **الحالة: ✘ لم يُختبر بعد على vault حقيقي في جهازك من قِبل المستخدم.** الكتابة مُختبرة آليًا على مجلدات مؤقتة (وفحصنا أن الـ YAML صحيح بمفسّر YAML حقيقي)، لكن لم تُفتح الملاحظة في برنامج Obsidian نفسه بعد.
+
+### ماذا يفعل؟
+يحفظ نتيجة الملخص الصباحي داخل مجلد **vault** الخاص بك كملفات عادية (لا يحتاج أي إضافة في Obsidian ولا يشترط أن يكون Obsidian مفتوحًا):
+
+```text
+MyVault\
+└─ NotebookLM\                                  ← المجلد الفرعي (قابل للتغيير)
+   ├─ ملخص صباحي 2026-11-03.md                  ← الملاحظة: frontmatter + البودكاست + الملخص + المصادر
+   └─ audio\ملخص صباحي 2026-11-03.m4a           ← نسخة من البودكاست، مضمَّنة في الملاحظة
+```
+رأس الملاحظة (YAML frontmatter) يحتوي: `date` و`title` و`notebook` (اسم الدفتر) و`notebook_id` و`sources` (قائمة الروابط) و`mode` و`audio` و`tags` (`notebooklm` و`morning-digest`، وكلمة `sample` في التجارب). والصوت مضمَّن بصيغة `![[...]]` فيعمل مشغّل Obsidian داخل الملاحظة.
+
+* **لا يستبدل ولا يعدّل شيئًا موجودًا:** إن كانت الملاحظة موجودة بنفس الاسم **يتخطاها** (تعديلاتك آمنة)، وإن كان اسم ملف الصوت مأخوذًا يضيف رقمًا (`(2)`). الكتابة بأسلوب «إنشاء حصري» فلا يمكن أن تُستبدل ملاحظة حتى لو تزامن تشغيلان. والتشغيل الثاني في اليوم نفسه له ملاحظته الخاصة باسمه المُرقَّم.
+* **لا ينشئ vault جديدًا:** المجلد الرئيسي يجب أن يكون موجودًا (أنشئه من Obsidian أولًا)، فلا يُنشأ vault عن طريق الخطأ إذا أخطأت في المسار. ويُنشأ المجلد الفرعي فقط، ولا يُسمح له بالخروج من الـ vault.
+* **اختياري ولا يكسر التشغيل:** كأي تسليم آخر، فشل الحفظ لا يغيّر رمز خروج `morning` ويظهر في `morning status`.
+
+### الإعداد (PowerShell على Windows)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+python -m notebooklm_lab config init                          # إن لم تفعل ذلك سابقًا
+notepad "E:\github\notebooklm\data\notebooklm-lab.env"
+```
+في ملف الإعدادات اكتب (بدون علامات اقتباس):
+```text
+OBSIDIAN_VAULT=E:\Obsidian\MyVault
+OBSIDIAN_SUBFOLDER=NotebookLM
+NOTEBOOKLM_LAB_OBSIDIAN_AUTO=
+```
+* `OBSIDIAN_VAULT`: المسار الكامل لمجلد الـ vault (المجلد الذي يحتوي `.obsidian`). **مطلوب.**
+* `OBSIDIAN_SUBFOLDER`: اختياري، الافتراضي `NotebookLM` (يمكن مسار فرعي مثل `Inbox/Podcasts`).
+* `NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1`: لحفظ تلقائي بعد كل `morning` (اتركه فارغًا للحفظ اليدوي فقط).
+
+### كيف أجرّبها؟ (أوامر PowerShell بالترتيب)
+```powershell
+cd E:\github\notebooklm
+.\.venv\Scripts\Activate.ps1
+$env:NOTEBOOKLM_LAB_DATA = "E:\github\notebooklm\data"
+
+python -m notebooklm_lab obsidian setup-check                 # يتأكد أن الـ vault موجود وقابل للكتابة
+python -m notebooklm_lab morning --sample --obsidian          # تجربة ببيانات مثال: يُنشئ ملاحظة + ملف صوت تجريبي
+python -m notebooklm_lab obsidian save --sample               # يحفظ آخر نتيجة تجريبية (يقول «موجودة مسبقًا» إن كانت محفوظة)
+python -m notebooklm_lab obsidian save --sample --subfolder "Test" --no-audio   # مجلد فرعي آخر وبدون نسخ الصوت
+python -m notebooklm_lab morning --obsidian                   # التشغيل الحقيقي (يحتاج تسجيل دخول NotebookLM)
+python -m notebooklm_lab morning --telegram --obsidian        # الاثنان معًا
+```
+ثم افتح Obsidian ← المجلد `NotebookLM` ← الملاحظة، وتأكد أن الصوت يُشغَّل وأن خصائص الملاحظة (Properties) تظهر. لإعادة التجربة ببيانات المثال احذف `E:\github\notebooklm\data\morning_state.sample.json` (وملاحظة التجربة من الـ vault إن أردت).
+
+| الأمر | الوظيفة |
+|---|---|
+| `obsidian setup-check [--vault ..] [--subfolder ..]` | يفحص الـ vault والكتابة |
+| `obsidian save [--run 2026-11-03] [--sample] [--no-audio]` | يحفظ آخر نتيجة (أو `--run`) كملاحظة؛ لا يستبدل شيئًا |
+| `morning --obsidian` / `--no-obsidian` | تفعيل/تعطيل الحفظ التلقائي لهذا التشغيل |
+
+رمز الخروج `6` = مشكلة كتابة في الـ vault (لأمر `obsidian` فقط).
+
 ## ٨. أين تُحفظ المخرجات؟ وكم حجمها؟ وكيف أراها أو أحذفها؟
 
 * المكان: `outputs\` داخل المجلد الذي شغّلت منه الأمر (تغييره: `--out` أو المتغير `NOTEBOOKLM_LAB_OUTPUT`). لكل تشغيل مجلد باسم الوقت، فيه `report.html` و`run.json` ومجلد `files\` للمخرجات.
@@ -382,6 +442,8 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 | تيليجرام: المنطق كاملًا (تقسيم الرسائل، الملف الكبير، ضغط ffmpeg، حد المعدل، إخفاء التوكن، عدم كسر `morning` عند الفشل) مقابل **خادم تيليجرام محلي مزيّف** + استدعاءات مزيّفة | ✔ اختبارات pytest (ضغط ffmpeg الحقيقي جُرّب على Linux بملف WAV) |
 | تيليجرام: إرسال **حقيقي** عبر بوت من @BotFather إلى حسابك (`setup-check` و`chat-id` و`send` و`morning --telegram`) | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
 | تيليجرام: ضغط ffmpeg على Windows لملف أكبر من 50MB | ✘ لم يُجرَّب على Windows |
+| Obsidian: كتابة الملاحظة وfrontmatter (يُفحص بمفسّر YAML) وتضمين الصوت، وعدم الاستبدال أبدًا، ورفض المسارات الخارجة عن الـ vault، وعدم كسر `morning` | ✔ اختبارات pytest على مجلدات مؤقتة |
+| Obsidian: فتح الملاحظة فعليًا في برنامج Obsidian وتشغيل الصوت داخلها، وكتابة `morning --obsidian` الحقيقي على vault على جهازك | ✘ **لم يُجرَّب بعد من قِبل المستخدم** |
 | خادم MCP الأصلي يبدأ ويعرض 38 أداة | ✔ مُختبر بالـ SDK الرسمي |
 | Claude Code / Codex / Hermes يستخدمونه فعليًا | ✘ لم يُجرَّب |
 | سكربت `scripts/setup.ps1` على Windows | ✘ لم يُجرَّب على Windows (كُتب وفق الأوامر اليدوية المختبرة على Linux) |
@@ -393,7 +455,7 @@ python -m notebooklm_lab selfcheck        # يشمل: الإصدار المثب�
 ```
 src/notebooklm_lab/   الكود: cli, pipeline, real_backend, sample_backend, report, storage, secrets_scan, selfcheck, agents,
                       morning (الملخص الصباحي), inbox (الروابط والحالة), scheduler (schtasks/cron),
-                      telegram (الإرسال إلى تيليجرام), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
+                      telegram (الإرسال إلى تيليجرام), obsidian (الحفظ في vault), deliver (قراءة نتيجة التشغيل), postrun (التسليم بعد التشغيل), settings (ملف الإعدادات)
 tests/                اختبارات pytest
 docs/AGENTS_SETUP.md  إعداد الوكلاء ·  docs/sample_report_preview.html  معاينة تقرير تجريبي
 examples/             links.txt و sample_notes.md

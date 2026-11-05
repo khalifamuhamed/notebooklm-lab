@@ -149,7 +149,7 @@ def _post_actions(outcome, paths, a) -> None:
     try:
         from .postrun import run_post_actions
 
-        run_post_actions(outcome, paths, telegram=a.telegram, say=print)
+        run_post_actions(outcome, paths, telegram=a.telegram, obsidian=a.obsidian, say=print)
     except Exception as exc:  # pragma: no cover - run_post_actions already guards itself
         print(f"⚠ تعذّر تنفيذ التسليم الإضافي ({type(exc).__name__}); الملخص سليم. / post-run delivery failed; the digest is intact.")
 
@@ -208,6 +208,27 @@ def cmd_telegram(a) -> int:
         rep = telegram.send_deliverable(token, chat, d)
     print(rep.summary())
     return 0 if rep.ok else telegram.EXIT_TELEGRAM
+
+
+def cmd_obsidian(a) -> int:
+    from . import deliver, obsidian
+
+    base = Path(a.data_dir) if a.data_dir else None
+    if a.ob_cmd == "setup-check":
+        return obsidian.setup_check(base, a.vault, a.subfolder)
+    try:
+        target = obsidian.resolve_target(base, a.vault, a.subfolder)
+    except obsidian.ObsidianError as exc:
+        print(f"✘ {exc}")
+        return 2
+    paths = _morning_paths(a)
+    d = deliver.from_run_dir(paths.outputs / a.run) if a.run else deliver.latest(paths.outputs)
+    if d is None:
+        print(f"✘ لا توجد نتيجة صباحية في {paths.outputs}")
+        return 2
+    rep = obsidian.save_deliverable(d, target, copy_audio=not a.no_audio)
+    print(rep.summary())
+    return 0 if rep.status in ("saved", "exists") else obsidian.EXIT_OBSIDIAN
 
 
 def cmd_session(a) -> int:
@@ -292,6 +313,8 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--open", action="store_true", help="open the report when done")
     m.add_argument("--telegram", action=argparse.BooleanOptionalAction, default=None,
                    help="send the summary + podcast to Telegram after a run (default: only if NOTEBOOKLM_LAB_TELEGRAM_AUTO=1)")
+    m.add_argument("--obsidian", action=argparse.BooleanOptionalAction, default=None,
+                   help="save the summary + podcast into your Obsidian vault after a run (default: only if NOTEBOOKLM_LAB_OBSIDIAN_AUTO=1)")
     m.set_defaults(fn=cmd_morning, morning_cmd=None)
     # sub-actions share --data-dir/--sample; SUPPRESS keeps values given before the action word
     common = argparse.ArgumentParser(add_help=False)
@@ -326,6 +349,20 @@ def build_parser() -> argparse.ArgumentParser:
     tgd.add_argument("--run", help="a morning run folder name such as 2026-11-03 (default: the latest)")
     tgd.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
     tg.set_defaults(fn=cmd_telegram, sample=False, run=None, file=None, caption=None, send_test=False)
+
+    ob = sub.add_parser("obsidian", help="save the morning summary + podcast into an Obsidian vault (setup-check / save)")
+    ob.add_argument("--data-dir", default=None)
+    obs = ob.add_subparsers(dest="ob_cmd", required=True)
+    odd = argparse.ArgumentParser(add_help=False)
+    odd.add_argument("--data-dir", default=argparse.SUPPRESS)
+    odd.add_argument("--vault", help="vault folder (default: $OBSIDIAN_VAULT)")
+    odd.add_argument("--subfolder", help="sub-folder inside the vault (default: $OBSIDIAN_SUBFOLDER or NotebookLM)")
+    obs.add_parser("setup-check", parents=[odd], help="check the vault folder is there and writable")
+    osv = obs.add_parser("save", parents=[odd], help="save the latest (or --run) morning result as a Markdown note; never overwrites")
+    osv.add_argument("--run", help="a morning run folder name such as 2026-11-03 (default: the latest)")
+    osv.add_argument("--sample", action="store_true", help="use the sample (demo) morning outputs")
+    osv.add_argument("--no-audio", action="store_true", help="do not copy the podcast into the vault (link to the original file)")
+    ob.set_defaults(fn=cmd_obsidian, sample=False, run=None, no_audio=False, vault=None, subfolder=None)
 
     s = sub.add_parser("session", help="where is my Google login session stored / delete it")
     s.add_argument("action", choices=["where", "delete"]), s.add_argument("--yes", action="store_true"), s.add_argument("--profile")
